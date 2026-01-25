@@ -4,7 +4,7 @@ Interactive visualization of U.S. internal migration patterns, showing where 6.5
 
 ## Live Demo
 
-[View the visualization](https://YOUR_USERNAME.github.io/follow-the-money/)
+[View the visualization](https://reymuniziii-svg.github.io/follow-the-money/scrollytelling.html)
 
 ## Features
 
