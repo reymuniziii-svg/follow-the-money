@@ -1,0 +1,3180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Follow the Money | The Great Reshuffling 2021-2022</title>
+
+    <!-- SEO & Social -->
+    <meta name="description" content="Interactive visualization of $558 billion in taxable income that changed addresses in 2021-2022. Explore where 6.5 million American households moved.">
+    <meta property="og:title" content="Follow the Money: Where Americans Actually Moved">
+    <meta property="og:description" content="$558 billion in taxable income changed addresses. Explore the Great American Reshuffling of 2021-2022.">
+    <meta property="og:type" content="website">
+    <meta property="og:image" content="preview.png">
+    <meta name="twitter:card" content="summary_large_image">
+    <meta name="twitter:title" content="Follow the Money: Where Americans Actually Moved">
+    <meta name="twitter:description" content="$558 billion in taxable income changed addresses. Interactive migration visualization.">
+
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400;1,500&family=IBM+Plex+Mono:wght@300;400;500&family=IBM+Plex+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+
+    <!-- MapLibre GL JS -->
+    <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet" />
+    <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+
+    <!-- deck.gl -->
+    <script src="https://unpkg.com/deck.gl@8.9.33/dist.min.js"></script>
+
+    <!-- D3.js -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+
+    <!-- Scrollama -->
+    <script src="https://unpkg.com/scrollama@3.2.0/build/scrollama.min.js"></script>
+
+    <style>
+        :root {
+            /* Core palette */
+            --california: #E07A5F;
+            --texas: #3D5A80;
+            --florida: #81B29A;
+            --local: #E8E8E8;
+
+            /* Background */
+            --paper: #FAF8F5;
+            --ink: #2C2C2C;
+            --ink-light: #4A4A4A;
+
+            /* Accents */
+            --gain: #50C878;
+            --loss: #A3320B;
+            --gold: #D4A853;
+
+            /* Typography scale */
+            --text-xs: 0.75rem;
+            --text-sm: 0.875rem;
+            --text-base: 1rem;
+            --text-lg: 1.125rem;
+            --text-xl: 1.25rem;
+            --text-2xl: 1.5rem;
+            --text-3xl: 2rem;
+            --text-4xl: 2.5rem;
+            --text-5xl: 3.5rem;
+            --text-6xl: 4.5rem;
+            --text-hero: clamp(4rem, 12vw, 10rem);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html {
+            scroll-behavior: smooth;
+        }
+
+        body {
+            font-family: 'IBM Plex Sans', -apple-system, sans-serif;
+            background: var(--paper);
+            color: var(--ink);
+            line-height: 1.6;
+            overflow-x: hidden;
+        }
+
+        /* Typography */
+        .display {
+            font-family: 'EB Garamond', Georgia, serif;
+            font-weight: 500;
+            line-height: 1.1;
+            letter-spacing: -0.02em;
+        }
+
+        .mono {
+            font-family: 'IBM Plex Mono', monospace;
+        }
+
+        /* ========================================
+           HERO SECTION - Elevated Design
+           ======================================== */
+        .hero {
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 2rem;
+            position: relative;
+            background: linear-gradient(180deg, var(--paper) 0%, #F5F0E8 100%);
+            overflow: hidden;
+        }
+
+        .hero::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            background:
+                radial-gradient(circle at 20% 30%, rgba(224, 122, 95, 0.12) 0%, transparent 50%),
+                radial-gradient(circle at 80% 70%, rgba(61, 90, 128, 0.12) 0%, transparent 50%),
+                radial-gradient(circle at 50% 50%, rgba(129, 178, 154, 0.05) 0%, transparent 70%);
+            pointer-events: none;
+            animation: heroGradientPulse 8s ease-in-out infinite;
+        }
+
+        @keyframes heroGradientPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.7; }
+        }
+
+        .hero-eyebrow {
+            font-size: var(--text-sm);
+            text-transform: uppercase;
+            letter-spacing: 0.25em;
+            color: var(--ink-light);
+            margin-bottom: 1.5rem;
+            opacity: 0;
+            animation: fadeUp 1s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        .hero-title {
+            font-size: var(--text-hero);
+            margin-bottom: 1.5rem;
+            opacity: 0;
+            animation: fadeUp 1s cubic-bezier(0.16, 1, 0.3, 1) 0.15s forwards;
+            background: linear-gradient(135deg, var(--ink) 0%, var(--ink-light) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .hero-subtitle {
+            font-size: var(--text-xl);
+            color: var(--ink-light);
+            max-width: 600px;
+            margin-bottom: 4rem;
+            opacity: 0;
+            animation: fadeUp 1s cubic-bezier(0.16, 1, 0.3, 1) 0.3s forwards;
+            line-height: 1.7;
+        }
+
+        .hero-stats {
+            display: flex;
+            gap: 5rem;
+            opacity: 0;
+            animation: fadeUp 1s cubic-bezier(0.16, 1, 0.3, 1) 0.45s forwards;
+        }
+
+        .hero-stat {
+            text-align: center;
+            position: relative;
+        }
+
+        .hero-stat-number {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: var(--text-6xl);
+            font-weight: 300;
+            letter-spacing: -0.03em;
+            color: var(--california);
+            line-height: 1;
+            transition: transform 0.3s ease;
+        }
+
+        .hero-stat-number:hover {
+            transform: scale(1.02);
+        }
+
+        .hero-stat-number.income {
+            color: var(--texas);
+        }
+
+        .hero-stat-label {
+            font-size: var(--text-sm);
+            color: var(--ink-light);
+            margin-top: 0.75rem;
+            max-width: 180px;
+        }
+
+        .scroll-indicator {
+            position: absolute;
+            bottom: 3rem;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 0.75rem;
+            opacity: 0;
+            animation: fadeUp 1s cubic-bezier(0.16, 1, 0.3, 1) 0.8s forwards;
+        }
+
+        .scroll-indicator span {
+            font-size: var(--text-xs);
+            text-transform: uppercase;
+            letter-spacing: 0.15em;
+            color: var(--ink-light);
+        }
+
+        .scroll-indicator .arrow {
+            width: 1px;
+            height: 40px;
+            background: linear-gradient(to bottom, var(--ink-light), transparent);
+            position: relative;
+            animation: scrollArrow 2s ease-in-out infinite;
+        }
+
+        .scroll-indicator .arrow::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: -4px;
+            width: 9px;
+            height: 9px;
+            border-right: 1px solid var(--ink-light);
+            border-bottom: 1px solid var(--ink-light);
+            transform: rotate(45deg);
+        }
+
+        @keyframes fadeUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        @keyframes scrollArrow {
+            0%, 100% { opacity: 1; transform: translateY(0); }
+            50% { opacity: 0.5; transform: translateY(8px); }
+        }
+
+        /* ========================================
+           SCROLLYTELLING SECTION - Cinematic
+           ======================================== */
+        .scrolly {
+            position: relative;
+        }
+
+        .scrolly__graphic {
+            position: sticky;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100vh;
+            z-index: 1;
+        }
+
+        #map-container {
+            width: 100%;
+            height: 100%;
+            background: #1a1a2e;
+        }
+
+        .scrolly__text {
+            position: relative;
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        /* Step Cards - Editorial Design with Entrance Animation */
+        .step {
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            padding: 2rem;
+            pointer-events: auto;
+        }
+
+        .step:first-child {
+            margin-top: -100vh;
+        }
+
+        .step__content {
+            background: rgba(250, 248, 245, 0.97);
+            backdrop-filter: blur(20px);
+            padding: 2.5rem 3rem;
+            max-width: 440px;
+            border-radius: 2px;
+            box-shadow:
+                0 4px 40px rgba(0, 0, 0, 0.08),
+                0 0 0 1px rgba(0, 0, 0, 0.03),
+                inset 0 1px 0 rgba(255, 255, 255, 0.5);
+            position: relative;
+            overflow: hidden;
+            /* Entrance animation */
+            opacity: 0;
+            transform: translateY(40px) scale(0.98);
+            transition: opacity 0.6s cubic-bezier(0.16, 1, 0.3, 1),
+                        transform 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .step.is-active .step__content {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+
+        /* Decorative accent bar */
+        .step__content::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 4px;
+            height: 100%;
+            background: var(--california);
+            transform: scaleY(0);
+            transform-origin: top;
+            transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.2s;
+        }
+
+        .step.is-active .step__content::before {
+            transform: scaleY(1);
+        }
+
+        /* Step number as design element */
+        .step__number {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 5rem;
+            font-weight: 200;
+            color: var(--california);
+            opacity: 0.08;
+            position: absolute;
+            top: -0.5rem;
+            right: 1rem;
+            line-height: 1;
+            pointer-events: none;
+        }
+
+        .step__title {
+            font-family: 'EB Garamond', serif;
+            font-size: var(--text-2xl);
+            font-weight: 500;
+            margin-bottom: 1rem;
+            line-height: 1.25;
+            position: relative;
+        }
+
+        .step__text {
+            font-size: var(--text-base);
+            color: var(--ink-light);
+            line-height: 1.8;
+        }
+
+        .step__text strong {
+            color: var(--ink);
+            font-weight: 500;
+        }
+
+        .step__highlight {
+            font-family: 'EB Garamond', serif;
+            font-style: italic;
+            font-size: 1.05em;
+            background: linear-gradient(180deg, transparent 55%, rgba(224, 122, 95, 0.25) 55%);
+            padding: 0 2px;
+        }
+
+        /* Different step accent colors */
+        .step[data-step="2"] .step__content::before { background: var(--texas); }
+        .step[data-step="2"] .step__number { color: var(--texas); }
+
+        .step[data-step="3"] .step__content::before { background: var(--florida); }
+        .step[data-step="3"] .step__number { color: var(--florida); }
+
+        .step[data-step="4"] .step__content::before { background: var(--gold); }
+        .step[data-step="4"] .step__number { color: var(--gold); }
+
+        .step[data-step="5"] .step__content::before { background: var(--gain); }
+        .step[data-step="5"] .step__number { color: var(--gain); }
+
+        .step[data-step="6"] .step__content::before { background: #9B59B6; }
+        .step[data-step="6"] .step__number { color: #9B59B6; }
+
+        .step[data-step="7"] .step__content::before { background: #F39C12; }
+        .step[data-step="7"] .step__number { color: #F39C12; }
+
+        .step[data-step="8"] .step__content::before { background: #1ABC9C; }
+        .step[data-step="8"] .step__number { color: #1ABC9C; }
+
+        /* Map Legend - Refined */
+        .map-legend {
+            position: absolute;
+            bottom: 2rem;
+            right: 2rem;
+            background: rgba(250, 248, 245, 0.95);
+            backdrop-filter: blur(10px);
+            padding: 1.25rem 1.5rem;
+            border-radius: 4px;
+            z-index: 10;
+            font-size: var(--text-sm);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+            opacity: 0;
+            transform: translateY(10px);
+            animation: fadeUp 0.6s ease 1.5s forwards;
+        }
+
+        .legend-title {
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+            font-size: var(--text-xs);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            color: var(--ink-light);
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 0.75rem;
+            margin-bottom: 0.5rem;
+        }
+
+        .legend-color {
+            width: 24px;
+            height: 3px;
+            border-radius: 2px;
+        }
+
+        .legend-item span {
+            font-size: var(--text-xs);
+        }
+
+        /* Step progress indicator */
+        .step-progress {
+            position: fixed;
+            right: 2rem;
+            top: 50%;
+            transform: translateY(-50%);
+            z-index: 100;
+            display: flex;
+            flex-direction: column;
+            gap: 0.75rem;
+        }
+
+        .step-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.5);
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .step-dot.active {
+            background: var(--california);
+            border-color: var(--california);
+            transform: scale(1.3);
+        }
+
+        .step-dot:hover {
+            background: rgba(255, 255, 255, 0.6);
+        }
+
+        .step-dot.active {
+            animation: dotPulse 0.3s ease-out;
+        }
+
+        @keyframes dotPulse {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.5); }
+            100% { transform: scale(1.3); }
+        }
+
+        /* Clickable cursor for arcs */
+        #map-container {
+            cursor: crosshair;
+        }
+
+        /* Hero stat hover effect */
+        .hero-stat {
+            cursor: pointer;
+            transition: transform 0.2s ease;
+        }
+
+        .hero-stat:hover {
+            transform: scale(1.02);
+        }
+
+        /* Fun fact tooltip */
+        .fun-fact {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: var(--ink);
+            color: var(--paper);
+            padding: 1.5rem 2rem;
+            border-radius: 12px;
+            font-size: var(--text-base);
+            text-align: center;
+            max-width: 400px;
+            z-index: 1000;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+        }
+
+        .fun-fact.show {
+            opacity: 1;
+            visibility: visible;
+        }
+
+        .fun-fact__title {
+            font-family: 'EB Garamond', serif;
+            font-size: var(--text-xl);
+            margin-bottom: 0.5rem;
+            color: var(--california);
+        }
+
+        /* ========================================
+           EXPLORER SECTION - Dark Theme
+           ======================================== */
+        .explorer {
+            background: var(--ink);
+            color: var(--paper);
+            padding: 8rem 2rem;
+            min-height: 100vh;
+        }
+
+        .explorer-container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+
+        .explorer-header {
+            text-align: center;
+            margin-bottom: 5rem;
+        }
+
+        .explorer-title {
+            font-size: var(--text-5xl);
+            margin-bottom: 1.5rem;
+            background: linear-gradient(135deg, var(--paper) 0%, rgba(250,248,245,0.7) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .explorer-subtitle {
+            font-size: var(--text-lg);
+            opacity: 0.6;
+            max-width: 500px;
+            margin: 0 auto;
+        }
+
+        /* Geolocation Button Row */
+        .search-row {
+            display: flex;
+            gap: 1rem;
+            max-width: 700px;
+            margin: 0 auto 4rem;
+            align-items: stretch;
+        }
+
+        .geolocate-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.6rem;
+            padding: 1rem 1.5rem;
+            background: var(--california);
+            color: white;
+            border: none;
+            border-radius: 60px;
+            font-family: 'IBM Plex Sans', sans-serif;
+            font-size: var(--text-base);
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .geolocate-btn:hover {
+            background: #c96a52;
+            transform: translateY(-2px);
+            box-shadow: 0 8px 20px rgba(224, 122, 95, 0.3);
+        }
+
+        .geolocate-btn:active {
+            transform: translateY(0);
+        }
+
+        .geolocate-btn.loading {
+            opacity: 0.7;
+            pointer-events: none;
+        }
+
+        .geolocate-btn .icon {
+            font-size: 1.2em;
+        }
+
+        @keyframes pulse-glow {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(224, 122, 95, 0.4); }
+            50% { box-shadow: 0 0 0 10px rgba(224, 122, 95, 0); }
+        }
+
+        .geolocate-btn.pulse {
+            animation: pulse-glow 2s ease-in-out infinite;
+        }
+
+        .search-container {
+            flex: 1;
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            height: 100%;
+            padding: 1.25rem 1.75rem;
+            font-size: var(--text-lg);
+            font-family: 'IBM Plex Sans', sans-serif;
+            background: rgba(255, 255, 255, 0.08);
+            border: 2px solid rgba(255, 255, 255, 0.15);
+            border-radius: 60px;
+            color: var(--paper);
+            outline: none;
+            transition: all 0.3s ease;
+        }
+
+        .search-input::placeholder {
+            color: rgba(255, 255, 255, 0.4);
+        }
+
+        .search-input:focus {
+            border-color: var(--california);
+            background: rgba(255, 255, 255, 0.12);
+            box-shadow: 0 0 0 4px rgba(224, 122, 95, 0.15);
+        }
+
+        .search-results {
+            position: absolute;
+            top: 100%;
+            left: 0;
+            right: 0;
+            background: var(--paper);
+            color: var(--ink);
+            border-radius: 12px;
+            margin-top: 0.75rem;
+            max-height: 320px;
+            overflow-y: auto;
+            display: none;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.4);
+        }
+
+        .search-results.active {
+            display: block;
+            animation: fadeUp 0.3s ease;
+        }
+
+        .search-result-item {
+            padding: 1rem 1.5rem;
+            cursor: pointer;
+            border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+            transition: all 0.2s ease;
+        }
+
+        .search-result-item:hover {
+            background: rgba(224, 122, 95, 0.08);
+            padding-left: 2rem;
+        }
+
+        .search-result-item:last-child {
+            border-bottom: none;
+        }
+
+        .explorer-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 3rem;
+            align-items: start;
+        }
+
+        .county-card {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 2.5rem;
+            display: none;
+        }
+
+        .county-card.active {
+            display: block;
+            animation: fadeUp 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .county-name {
+            font-size: var(--text-4xl);
+            margin-bottom: 0.25rem;
+        }
+
+        .county-state {
+            font-size: var(--text-lg);
+            opacity: 0.5;
+            margin-bottom: 2.5rem;
+        }
+
+        .county-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1rem;
+        }
+
+        .county-stat {
+            background: rgba(255, 255, 255, 0.04);
+            padding: 1.5rem;
+            border-radius: 8px;
+            transition: background 0.3s ease;
+        }
+
+        .county-stat:hover {
+            background: rgba(255, 255, 255, 0.08);
+        }
+
+        .county-stat-percentile {
+            font-size: var(--text-xs);
+            color: rgba(255, 255, 255, 0.5);
+            margin-top: 0.35rem;
+        }
+
+        .county-stat-percentile.highlight {
+            color: var(--gain);
+        }
+
+        .county-stat-value {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: var(--text-2xl);
+            font-weight: 400;
+            margin-bottom: 0.25rem;
+        }
+
+        .county-stat-value.positive {
+            color: var(--gain);
+        }
+
+        .county-stat-value.negative {
+            color: var(--loss);
+        }
+
+        .county-stat-label {
+            font-size: var(--text-xs);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            opacity: 0.5;
+        }
+
+        .chord-container {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 12px;
+            padding: 2rem;
+            min-height: 420px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .chord-placeholder {
+            text-align: center;
+            opacity: 0.4;
+        }
+
+        .chord-placeholder svg {
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        #chord-diagram {
+            width: 100%;
+            height: 400px;
+        }
+
+        /* Mini-map for geographic context */
+        .mini-map-container {
+            display: flex;
+            gap: 2rem;
+            margin-bottom: 2rem;
+            align-items: flex-start;
+        }
+
+        .county-header-info {
+            flex: 1;
+        }
+
+        .county-header-info .county-name {
+            font-size: var(--text-3xl);
+            margin-bottom: 0.25rem;
+        }
+
+        .county-header-info .county-state {
+            margin-bottom: 0;
+        }
+
+        #mini-map {
+            width: 200px;
+            height: 130px;
+            background: rgba(255, 255, 255, 0.02);
+            border-radius: 8px;
+            flex-shrink: 0;
+        }
+
+        #mini-map .state {
+            fill: rgba(255, 255, 255, 0.1);
+            stroke: rgba(255, 255, 255, 0.05);
+            stroke-width: 0.5;
+        }
+
+        #mini-map .state.highlighted {
+            fill: rgba(255, 255, 255, 0.25);
+        }
+
+        #mini-map .county-marker {
+            fill: var(--california);
+            filter: drop-shadow(0 0 6px var(--california));
+        }
+
+        @keyframes marker-pulse {
+            0%, 100% { r: 5; opacity: 1; }
+            50% { r: 8; opacity: 0.7; }
+        }
+
+        #mini-map .county-marker {
+            animation: marker-pulse 2s ease-in-out infinite;
+        }
+
+        /* County Story Narrative */
+        .county-story {
+            background: linear-gradient(135deg, rgba(224, 122, 95, 0.08), rgba(129, 178, 154, 0.08));
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 12px;
+            padding: 2rem 2.5rem;
+            margin: 2.5rem 0;
+            font-size: var(--text-lg);
+            line-height: 1.7;
+            font-family: 'EB Garamond', serif;
+            display: none;
+        }
+
+        .county-story.active {
+            display: block;
+            animation: fadeUp 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .county-story strong {
+            color: var(--paper);
+            font-weight: 600;
+        }
+
+        /* Flow Lists (Origins/Destinations) */
+        .flow-lists {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 2rem;
+            margin: 2.5rem 0;
+            display: none;
+        }
+
+        .flow-lists.active {
+            display: grid;
+            animation: fadeUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
+        }
+
+        .flow-list {
+            background: rgba(255, 255, 255, 0.03);
+            border-radius: 12px;
+            padding: 1.5rem;
+        }
+
+        .flow-list__title {
+            font-size: var(--text-xs);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            margin-bottom: 1rem;
+            opacity: 0.5;
+        }
+
+        .flow-list__title.inbound {
+            color: var(--gain);
+        }
+
+        .flow-list__title.outbound {
+            color: var(--california);
+        }
+
+        .flow-list__item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .flow-list__item:last-child {
+            border-bottom: none;
+        }
+
+        .flow-list__item:hover {
+            background: rgba(255, 255, 255, 0.05);
+            margin: 0 -0.75rem;
+            padding: 0.75rem;
+            border-radius: 6px;
+        }
+
+        .flow-list__rank {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: var(--text-xs);
+            opacity: 0.4;
+            margin-right: 0.75rem;
+            width: 1.5rem;
+        }
+
+        .flow-list__name {
+            flex: 1;
+            font-size: var(--text-sm);
+        }
+
+        .flow-list__value {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: var(--text-sm);
+            opacity: 0.7;
+        }
+
+        /* Similar Counties */
+        .similar-counties {
+            margin-top: 3rem;
+            display: none;
+        }
+
+        .similar-counties.active {
+            display: block;
+            animation: fadeUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) 0.2s both;
+        }
+
+        .similar-counties__title {
+            font-size: var(--text-xs);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            opacity: 0.5;
+            margin-bottom: 1rem;
+        }
+
+        .similar-counties__list {
+            display: flex;
+            gap: 0.75rem;
+            flex-wrap: wrap;
+        }
+
+        .similar-county-chip {
+            background: rgba(255, 255, 255, 0.06);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 30px;
+            padding: 0.6rem 1.25rem;
+            font-size: var(--text-sm);
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .similar-county-chip:hover {
+            background: rgba(224, 122, 95, 0.15);
+            border-color: var(--california);
+            transform: translateY(-2px);
+        }
+
+        .similar-county-chip .net {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: var(--text-xs);
+            opacity: 0.6;
+            margin-left: 0.5rem;
+        }
+
+        .share-btn {
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            margin-top: 1.5rem;
+            padding: 0.75rem 1.25rem;
+            background: var(--california);
+            color: white;
+            border: none;
+            border-radius: 30px;
+            font-family: 'IBM Plex Sans', sans-serif;
+            font-size: var(--text-sm);
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .share-btn:hover {
+            background: #c96a52;
+            transform: translateY(-1px);
+        }
+
+        .share-btn.copied {
+            background: var(--gain);
+        }
+
+        .share-btn.copied span::after {
+            content: ' ✓';
+        }
+
+        /* Toast notification */
+        .toast {
+            position: fixed;
+            bottom: 2rem;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: var(--ink);
+            color: var(--paper);
+            padding: 1rem 1.5rem;
+            border-radius: 8px;
+            font-size: var(--text-sm);
+            opacity: 0;
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+
+        /* Screen reader only */
+        .sr-only {
+            position: absolute;
+            width: 1px;
+            height: 1px;
+            padding: 0;
+            margin: -1px;
+            overflow: hidden;
+            clip: rect(0, 0, 0, 0);
+            white-space: nowrap;
+            border: 0;
+        }
+
+        /* Keyboard hint */
+        .keyboard-hint {
+            position: fixed;
+            bottom: 2rem;
+            right: 2rem;
+            background: var(--ink);
+            color: var(--paper);
+            padding: 0.75rem 1.25rem;
+            border-radius: 8px;
+            font-size: var(--text-sm);
+            opacity: 0;
+            transform: translateY(10px);
+            transition: all 0.3s ease;
+            z-index: 100;
+            pointer-events: none;
+        }
+
+        .keyboard-hint.show {
+            opacity: 0.9;
+            transform: translateY(0);
+        }
+
+        @media (max-width: 768px) {
+            .keyboard-hint {
+                display: none;
+            }
+        }
+
+        /* Corridor detail modal */
+        .corridor-modal {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) scale(0.9);
+            background: var(--paper);
+            border-radius: 12px;
+            padding: 2rem;
+            box-shadow: 0 25px 80px rgba(0, 0, 0, 0.3);
+            z-index: 1000;
+            max-width: 400px;
+            width: 90%;
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        .corridor-modal.active {
+            opacity: 1;
+            visibility: visible;
+            transform: translate(-50%, -50%) scale(1);
+        }
+
+        .corridor-modal__close {
+            position: absolute;
+            top: 1rem;
+            right: 1rem;
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+            color: var(--ink-light);
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.2s ease;
+        }
+
+        .corridor-modal__close:hover {
+            background: rgba(0, 0, 0, 0.05);
+            color: var(--ink);
+        }
+
+        .corridor-modal__title {
+            font-family: 'EB Garamond', serif;
+            font-size: var(--text-xl);
+            font-weight: 500;
+            margin-bottom: 1.5rem;
+            padding-right: 2rem;
+            line-height: 1.3;
+        }
+
+        .corridor-modal__stats {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .corridor-stat {
+            background: rgba(0, 0, 0, 0.03);
+            padding: 1rem;
+            border-radius: 8px;
+        }
+
+        .corridor-stat__value {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: var(--text-xl);
+            font-weight: 500;
+            color: var(--california);
+            margin-bottom: 0.25rem;
+        }
+
+        .corridor-stat__label {
+            font-size: var(--text-xs);
+            color: var(--ink-light);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .corridor-modal__reverse {
+            background: rgba(129, 178, 154, 0.1);
+            padding: 0.75rem 1rem;
+            border-radius: 6px;
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 1rem;
+        }
+
+        .corridor-reverse__label {
+            font-size: var(--text-sm);
+            color: var(--ink-light);
+        }
+
+        .corridor-reverse__value {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: var(--text-sm);
+            color: var(--florida);
+        }
+
+        .corridor-modal__hint {
+            font-size: var(--text-xs);
+            color: var(--ink-light);
+            text-align: center;
+            opacity: 0.6;
+        }
+
+        /* Modal backdrop */
+        .corridor-modal::before {
+            content: '';
+            position: fixed;
+            top: -100vh;
+            left: -100vw;
+            right: -100vw;
+            bottom: -100vh;
+            background: rgba(0, 0, 0, 0.4);
+            z-index: -1;
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+
+        .corridor-modal.active::before {
+            opacity: 1;
+        }
+
+        /* ========================================
+           FOOTER
+           ======================================== */
+        .footer {
+            background: #1a1a1a;
+            color: var(--paper);
+            padding: 4rem 2rem;
+            text-align: center;
+        }
+
+        .footer-source {
+            font-size: var(--text-sm);
+            opacity: 0.5;
+            margin-bottom: 0.75rem;
+        }
+
+        .footer-source a {
+            color: var(--california);
+            text-decoration: none;
+        }
+
+        .footer-credit {
+            font-size: var(--text-xs);
+            opacity: 0.3;
+        }
+
+        /* ========================================
+           MOBILE RESPONSIVENESS
+           ======================================== */
+        @media (max-width: 768px) {
+            .hero-stats {
+                flex-direction: column;
+                gap: 2.5rem;
+            }
+
+            .hero-stat-number {
+                font-size: var(--text-5xl);
+            }
+
+            .hero-title {
+                font-size: clamp(2.5rem, 10vw, 5rem);
+            }
+
+            .step__content {
+                max-width: 100%;
+                margin: 0 0.5rem;
+                padding: 2rem;
+            }
+
+            .step__number {
+                font-size: 3rem;
+                right: 0.5rem;
+            }
+
+            .map-legend {
+                bottom: auto;
+                top: 1rem;
+                right: 1rem;
+                padding: 0.75rem 1rem;
+            }
+
+            .step-progress {
+                display: none;
+            }
+
+            /* Explorer mobile layout */
+            .search-row {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            .geolocate-btn {
+                width: 100%;
+                justify-content: center;
+            }
+
+            .explorer-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .mini-map-container {
+                flex-direction: column;
+                gap: 1rem;
+            }
+
+            #mini-map {
+                width: 100%;
+                height: 100px;
+            }
+
+            .county-stats {
+                grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+            }
+
+            .chord-container {
+                min-height: min(400px, 50vh);
+            }
+
+            .explorer-title {
+                font-size: var(--text-3xl);
+            }
+
+            .county-story {
+                padding: 1.5rem;
+                font-size: var(--text-base);
+            }
+
+            .flow-lists {
+                grid-template-columns: 1fr;
+                gap: 1.5rem;
+            }
+
+            .similar-counties__list {
+                gap: 0.5rem;
+            }
+
+            .similar-county-chip {
+                padding: 0.5rem 1rem;
+                font-size: var(--text-xs);
+            }
+        }
+
+        /* ========================================
+           TOOLTIP STYLES
+           ======================================== */
+        .deck-tooltip {
+            font-family: 'IBM Plex Sans', sans-serif !important;
+            background: rgba(250, 248, 245, 0.98) !important;
+            color: var(--ink) !important;
+            padding: 14px 18px !important;
+            border-radius: 6px !important;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2) !important;
+            font-size: 14px !important;
+            max-width: 280px !important;
+            border: 1px solid rgba(0, 0, 0, 0.05) !important;
+        }
+
+        .tooltip-title {
+            font-weight: 600;
+            margin-bottom: 6px;
+            font-size: 13px;
+        }
+
+        .tooltip-row {
+            display: flex;
+            justify-content: space-between;
+            margin-top: 4px;
+        }
+
+        .tooltip-label {
+            opacity: 0.6;
+        }
+
+        .tooltip-value {
+            font-family: 'IBM Plex Mono', monospace;
+            font-weight: 500;
+            color: var(--california);
+        }
+    </style>
+</head>
+<body>
+    <!-- Hero Section -->
+    <section class="hero">
+        <p class="hero-eyebrow">IRS Migration Data 2021-2022</p>
+        <h1 class="hero-title display">Follow the Money</h1>
+        <p class="hero-subtitle">In one year, millions of Americans packed up and moved to a new county. Where did they go&mdash;and what did they take with them?</p>
+
+        <div class="hero-stats">
+            <div class="hero-stat">
+                <div class="hero-stat-number" id="stat-returns">0</div>
+                <div class="hero-stat-label">Tax returns moved counties</div>
+            </div>
+            <div class="hero-stat">
+                <div class="hero-stat-number income" id="stat-income">$0</div>
+                <div class="hero-stat-label">In taxable income changed addresses</div>
+            </div>
+        </div>
+
+        <div class="scroll-indicator">
+            <span>Scroll to explore</span>
+            <div class="arrow"></div>
+        </div>
+    </section>
+
+    <!-- Step Progress Dots -->
+    <div class="step-progress" id="step-progress">
+        <div class="step-dot" data-step="1"></div>
+        <div class="step-dot" data-step="2"></div>
+        <div class="step-dot" data-step="3"></div>
+        <div class="step-dot" data-step="4"></div>
+        <div class="step-dot" data-step="5"></div>
+        <div class="step-dot" data-step="6"></div>
+        <div class="step-dot" data-step="7"></div>
+        <div class="step-dot" data-step="8"></div>
+    </div>
+
+    <!-- Scrollytelling Section -->
+    <section class="scrolly">
+        <div class="scrolly__graphic">
+            <div id="map-container"></div>
+            <div class="map-legend" id="map-legend">
+                <div class="legend-title">Migration Flow</div>
+                <div class="legend-item">
+                    <div class="legend-color" style="background: linear-gradient(90deg, var(--california), var(--florida));"></div>
+                    <span>Origin → Destination</span>
+                </div>
+                <div class="legend-divider" id="choropleth-legend" style="display: none; margin-top: 0.75rem; padding-top: 0.75rem; border-top: 1px solid rgba(0,0,0,0.1);">
+                    <div class="legend-title" style="margin-bottom: 0.5rem;">Net Migration</div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #2EEB78; width: 16px; height: 16px; border-radius: 2px;"></div>
+                        <span>Gaining population</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color" style="background: #FF5050; width: 16px; height: 16px; border-radius: 2px;"></div>
+                        <span>Losing population</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="scrolly__text">
+            <div class="step" data-step="1">
+                <div class="step__content">
+                    <div class="step__number">01</div>
+                    <h2 class="step__title">The California Exodus</h2>
+                    <p class="step__text">
+                        California led the nation in outbound migration. <strong>Los Angeles County alone</strong> saw over <span class="step__highlight">70,000 households</span> file their taxes from a different county the following year.
+                    </p>
+                </div>
+            </div>
+
+            <div class="step" data-step="2">
+                <div class="step__content">
+                    <div class="step__number">02</div>
+                    <h2 class="step__title">Where Did They Go?</h2>
+                    <p class="step__text">
+                        Texas, Nevada, and Arizona were the top destinations. <strong>Clark County (Las Vegas)</strong> gained over 10,000 net households, while Texas suburbs like <span class="step__highlight">Collin and Williamson counties</span> saw explosive growth.
+                    </p>
+                </div>
+            </div>
+
+            <div class="step" data-step="3">
+                <div class="step__content">
+                    <div class="step__number">03</div>
+                    <h2 class="step__title">The Local Surprise</h2>
+                    <p class="step__text">
+                        Most moves weren&rsquo;t cross-country. The <strong>top migration corridor?</strong> LA to Orange County&mdash;just 30 miles. <span class="step__highlight">21,267 households</span> made that short hop, taking $2.4 billion in income.
+                    </p>
+                </div>
+            </div>
+
+            <div class="step" data-step="4">
+                <div class="step__content">
+                    <div class="step__number">04</div>
+                    <h2 class="step__title">Following the Money</h2>
+                    <p class="step__text">
+                        Income didn&rsquo;t move equally. <strong>High earners</strong> disproportionately left high-tax states. Middlesex County (Boston) lost <span class="step__highlight">$2 billion in AGI</span>&mdash;despite &ldquo;only&rdquo; losing 8,844 net returns.
+                    </p>
+                </div>
+            </div>
+
+            <div class="step" data-step="5">
+                <div class="step__content">
+                    <div class="step__number">05</div>
+                    <h2 class="step__title">Winners &amp; Losers</h2>
+                    <p class="step__text">
+                        <strong>Top gainers:</strong> Florida&rsquo;s Polk County (+11,721), Nevada&rsquo;s Clark County (+10,067). <strong>Top losers:</strong> Philadelphia (-9,643), San Diego (-8,622). <span class="step__highlight">The Sunbelt surge is real.</span>
+                    </p>
+                </div>
+            </div>
+
+            <div class="step" data-step="6">
+                <div class="step__content">
+                    <div class="step__number">06</div>
+                    <h2 class="step__title">The Remote Work Effect</h2>
+                    <p class="step__text">
+                        When offices closed, <strong>tech hubs emptied</strong>. San Francisco lost households to Austin, Denver, and Boise. <span class="step__highlight">Silicon Valley&rsquo;s outflow funded a dozen new tech scenes.</span>
+                    </p>
+                </div>
+            </div>
+
+            <div class="step" data-step="7">
+                <div class="step__content">
+                    <div class="step__number">07</div>
+                    <h2 class="step__title">The Retirement Belt</h2>
+                    <p class="step__text">
+                        Follow the snowbirds. <strong>Northern counties</strong> send a steady stream to Florida and Arizona. Maricopa County (Phoenix) alone gained <span class="step__highlight">$1.2 billion in retirement income</span>.
+                    </p>
+                </div>
+            </div>
+
+            <div class="step" data-step="8">
+                <div class="step__content">
+                    <div class="step__number">08</div>
+                    <h2 class="step__title">The Boomerang</h2>
+                    <p class="step__text">
+                        Migration isn&rsquo;t one-way. For every corridor, there&rsquo;s a reverse flow. <strong>LA to SF</strong> and <strong>SF to LA</strong> trade nearly equal volumes. <span class="step__highlight">The American shuffle never stops.</span>
+                    </p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Explorer Section -->
+    <section class="explorer" id="explorer">
+        <div class="explorer-container">
+            <div class="explorer-header">
+                <h2 class="explorer-title display">Find Your County</h2>
+                <p class="explorer-subtitle">Discover where your neighbors moved &mdash; and who moved in</p>
+            </div>
+
+            <!-- Search Row with Geolocation -->
+            <div class="search-row">
+                <button class="geolocate-btn pulse" id="geolocate-btn">
+                    <span class="icon">📍</span>
+                    <span>Find My County</span>
+                </button>
+                <div class="search-container">
+                    <input type="text" class="search-input" id="county-search" placeholder="Or search by name (e.g., Los Angeles, Cook...)">
+                    <div class="search-results" id="search-results"></div>
+                </div>
+            </div>
+
+            <div class="explorer-grid">
+                <!-- Left Column: Mini-map + Stats Card -->
+                <div class="county-card" id="county-card">
+                    <div class="mini-map-container">
+                        <svg id="mini-map" viewBox="0 0 960 600"></svg>
+                        <div class="county-header-info">
+                            <h3 class="county-name display" id="selected-county-name">-</h3>
+                            <p class="county-state" id="selected-county-state">Select a county above</p>
+                        </div>
+                    </div>
+
+                    <div class="county-stats">
+                        <div class="county-stat">
+                            <div class="county-stat-value" id="county-inflow">-</div>
+                            <div class="county-stat-label">Inbound Returns</div>
+                            <div class="county-stat-percentile" id="county-inflow-pct"></div>
+                        </div>
+                        <div class="county-stat">
+                            <div class="county-stat-value" id="county-outflow">-</div>
+                            <div class="county-stat-label">Outbound Returns</div>
+                            <div class="county-stat-percentile" id="county-outflow-pct"></div>
+                        </div>
+                        <div class="county-stat">
+                            <div class="county-stat-value" id="county-net">-</div>
+                            <div class="county-stat-label">Net Migration</div>
+                            <div class="county-stat-percentile" id="county-net-pct"></div>
+                        </div>
+                        <div class="county-stat">
+                            <div class="county-stat-value" id="county-agi">-</div>
+                            <div class="county-stat-label">Net Income Change</div>
+                            <div class="county-stat-percentile" id="county-agi-pct"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Right Column: Chord Diagram -->
+                <div class="chord-container">
+                    <div class="chord-placeholder" id="chord-placeholder">
+                        <svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1">
+                            <circle cx="12" cy="12" r="10"/>
+                            <path d="M12 2a10 10 0 0 1 0 20"/>
+                            <path d="M12 2a10 10 0 0 0 0 20"/>
+                        </svg>
+                        <p>Select a county to see migration flows</p>
+                    </div>
+                    <svg id="chord-diagram"></svg>
+                    <button class="share-btn" id="share-btn" style="display: none;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M4 12v8a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-8"/>
+                            <polyline points="16,6 12,2 8,6"/>
+                            <line x1="12" y1="2" x2="12" y2="15"/>
+                        </svg>
+                        <span>Share this county</span>
+                    </button>
+                </div>
+            </div>
+
+            <!-- County Story Narrative -->
+            <div class="county-story" id="county-story"></div>
+
+            <!-- Flow Lists: Origins and Destinations -->
+            <div class="flow-lists" id="flow-lists">
+                <div class="flow-list">
+                    <div class="flow-list__title inbound">Where They Came From</div>
+                    <div id="inflow-list"></div>
+                </div>
+                <div class="flow-list">
+                    <div class="flow-list__title outbound">Where They Went</div>
+                    <div id="outflow-list"></div>
+                </div>
+            </div>
+
+            <!-- Similar Counties -->
+            <div class="similar-counties" id="similar-counties">
+                <div class="similar-counties__title">Counties with Similar Patterns</div>
+                <div class="similar-counties__list" id="similar-list"></div>
+            </div>
+        </div>
+    </section>
+
+    <!-- Toast notification -->
+    <div class="toast" id="toast">Link copied to clipboard!</div>
+
+    <!-- Screen reader live region -->
+    <div aria-live="polite" aria-atomic="true" class="sr-only" id="sr-announcer"></div>
+
+    <!-- Keyboard hint (shows briefly on first load) -->
+    <div class="keyboard-hint" id="keyboard-hint">
+        <span>Use arrow keys to navigate</span>
+    </div>
+
+    <!-- Fun fact Easter egg -->
+    <div class="fun-fact" id="fun-fact">
+        <div class="fun-fact__title">Did you know?</div>
+        <p id="fun-fact-text"></p>
+    </div>
+
+    <!-- Corridor detail modal -->
+    <div class="corridor-modal" id="corridor-modal">
+        <div class="corridor-modal__content">
+            <button class="corridor-modal__close" id="corridor-close">&times;</button>
+            <h3 class="corridor-modal__title" id="corridor-title">Migration Corridor</h3>
+            <div class="corridor-modal__stats">
+                <div class="corridor-stat">
+                    <div class="corridor-stat__value" id="corridor-returns">-</div>
+                    <div class="corridor-stat__label">Households moved</div>
+                </div>
+                <div class="corridor-stat">
+                    <div class="corridor-stat__value" id="corridor-income">-</div>
+                    <div class="corridor-stat__label">Income transferred</div>
+                </div>
+            </div>
+            <div class="corridor-modal__reverse" id="corridor-reverse">
+                <span class="corridor-reverse__label">Reverse flow:</span>
+                <span class="corridor-reverse__value" id="corridor-reverse-value">-</span>
+            </div>
+            <p class="corridor-modal__hint">Click anywhere on the map to close</p>
+        </div>
+    </div>
+
+    <!-- Footer -->
+    <footer class="footer">
+        <p class="footer-source">Data: <a href="https://www.irs.gov/statistics/soi-tax-stats-migration-data" target="_blank">IRS Statistics of Income</a>, County-to-County Migration 2021-2022</p>
+        <p class="footer-credit">Visualization crafted with deck.gl, D3.js, and Scrollama</p>
+    </footer>
+
+    <script>
+        // ============================================
+        // DATA & STATE
+        // ============================================
+
+        let flowsData = [];
+        let countyStats = [];
+        let summaryData = {};
+        let countyGeoJson = null;
+        let countyStatsMap = {};
+        let highlightedArc = null;
+        let animationFrame = null;
+        let arcOpacity = 1;
+        let flowAnimationTime = 0;
+        let isFlowAnimating = true;
+        let showChoropleth = true;
+        let selectedCountyFips = null;
+
+        // ============================================
+        // URL STATE MANAGEMENT
+        // ============================================
+
+        function updateURL() {
+            const params = new URLSearchParams();
+            if (currentStep > 1) params.set('step', currentStep);
+            if (selectedCountyFips) params.set('county', selectedCountyFips);
+
+            const newURL = params.toString()
+                ? `${window.location.pathname}?${params}`
+                : window.location.pathname;
+
+            history.replaceState(null, '', newURL);
+        }
+
+        function readURLState() {
+            const params = new URLSearchParams(window.location.search);
+            return {
+                step: parseInt(params.get('step')) || null,
+                county: params.get('county') || null
+            };
+        }
+
+        function shareCurrentView() {
+            const url = window.location.href;
+            navigator.clipboard.writeText(url).then(() => {
+                const btn = document.getElementById('share-btn');
+                const toast = document.getElementById('toast');
+
+                btn.classList.add('copied');
+                toast.classList.add('show');
+
+                setTimeout(() => {
+                    btn.classList.remove('copied');
+                    toast.classList.remove('show');
+                }, 2000);
+            });
+        }
+
+        const STATE_NAMES = {
+            '01': 'Alabama', '02': 'Alaska', '04': 'Arizona', '05': 'Arkansas', '06': 'California',
+            '08': 'Colorado', '09': 'Connecticut', '10': 'Delaware', '11': 'DC', '12': 'Florida',
+            '13': 'Georgia', '15': 'Hawaii', '16': 'Idaho', '17': 'Illinois', '18': 'Indiana',
+            '19': 'Iowa', '20': 'Kansas', '21': 'Kentucky', '22': 'Louisiana', '23': 'Maine',
+            '24': 'Maryland', '25': 'Massachusetts', '26': 'Michigan', '27': 'Minnesota',
+            '28': 'Mississippi', '29': 'Missouri', '30': 'Montana', '31': 'Nebraska', '32': 'Nevada',
+            '33': 'New Hampshire', '34': 'New Jersey', '35': 'New Mexico', '36': 'New York',
+            '37': 'North Carolina', '38': 'North Dakota', '39': 'Ohio', '40': 'Oklahoma',
+            '41': 'Oregon', '42': 'Pennsylvania', '44': 'Rhode Island', '45': 'South Carolina',
+            '46': 'South Dakota', '47': 'Tennessee', '48': 'Texas', '49': 'Utah', '50': 'Vermont',
+            '51': 'Virginia', '53': 'Washington', '54': 'West Virginia', '55': 'Wisconsin', '56': 'Wyoming'
+        };
+
+        // ============================================
+        // HERO ANIMATION - Enhanced Counter
+        // ============================================
+
+        function animateCounter(element, target, prefix = '', suffix = '', duration = 2500) {
+            const start = 0;
+            const startTime = performance.now();
+
+            function update(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+
+                // Smooth ease-out with slight overshoot
+                const easeOut = 1 - Math.pow(1 - progress, 4);
+                const current = Math.floor(start + (target - start) * easeOut);
+
+                if (target >= 1000000000) {
+                    element.textContent = prefix + (current / 1000000000).toFixed(0) + 'B' + suffix;
+                } else if (target >= 1000000) {
+                    element.textContent = prefix + (current / 1000000).toFixed(1) + 'M' + suffix;
+                } else if (target >= 1000) {
+                    element.textContent = prefix + (current / 1000).toFixed(0) + 'K' + suffix;
+                } else {
+                    element.textContent = prefix + current.toLocaleString() + suffix;
+                }
+
+                if (progress < 1) {
+                    requestAnimationFrame(update);
+                } else {
+                    // Final value with pulse effect
+                    if (target >= 1000000000) {
+                        element.textContent = prefix + (target / 1000000000).toFixed(0) + 'B' + suffix;
+                    } else if (target >= 1000000) {
+                        element.textContent = prefix + (target / 1000000).toFixed(1) + 'M' + suffix;
+                    }
+                    // Subtle scale pulse on complete
+                    element.style.transform = 'scale(1.03)';
+                    setTimeout(() => { element.style.transform = 'scale(1)'; }, 150);
+                }
+            }
+
+            requestAnimationFrame(update);
+        }
+
+        // ============================================
+        // MAP SETUP - Cinematic Transitions
+        // ============================================
+
+        let map;
+        let deckOverlay;
+        let currentStep = 0;
+        let isTransitioning = false;
+
+        function initDeckOverlay() {
+            if (deckOverlay) return;
+            console.log('Initializing deck.gl overlay with', flowsData.length, 'flows');
+
+            deckOverlay = new deck.MapboxOverlay({
+                layers: [],
+                getTooltip: ({object}) => object && {
+                    html: `
+                        <div class="tooltip-title">${object.from_name} &rarr; ${object.to_name}</div>
+                        <div class="tooltip-row">
+                            <span class="tooltip-label">Households</span>
+                            <span class="tooltip-value">${object.returns.toLocaleString()}</span>
+                        </div>
+                        <div class="tooltip-row">
+                            <span class="tooltip-label">Income moved</span>
+                            <span class="tooltip-value">$${(object.agi / 1000000).toFixed(1)}M</span>
+                        </div>
+                    `
+                }
+            });
+
+            map.addControl(deckOverlay);
+
+            // Start the flow animation loop
+            startFlowAnimation();
+
+            // Initial render with fade-in
+            setTimeout(() => updateMapForStep(1), 500);
+        }
+
+        function startFlowAnimation() {
+            if (animationFrame) cancelAnimationFrame(animationFrame);
+
+            function animate(timestamp) {
+                if (!isFlowAnimating) return;
+
+                flowAnimationTime = timestamp;
+
+                // Only update if we have flows and overlay
+                if (deckOverlay && currentFlows.length > 0 && !isTransitioning) {
+                    const layers = [];
+
+                    // Layer 1: Choropleth underlay (shows for steps 4+)
+                    if (currentStep >= 4 && countyGeoJson) {
+                        const choropleth = createChoroplethLayer();
+                        if (choropleth) layers.push(choropleth);
+                    }
+
+                    // Layer 2: Glow effects for top destinations (steps 4+)
+                    if (currentStep >= 4) {
+                        const topCounties = countyStats
+                            .filter(c => c.centroid && Math.abs(c.net) > 3000)
+                            .slice(0, 20);
+                        layers.push(createGlowLayer(topCounties));
+                    }
+
+                    // Layer 3: Arc track (subtle background)
+                    layers.push(createArcTrackLayer(currentFlows, 40));
+
+                    // Layer 4: Animated arc flows
+                    layers.push(createArcLayer(currentFlows, arcOpacity));
+
+                    // Layer 5: Particle dots traveling along arcs (optional, for extra wow)
+                    if (currentFlows.length <= 200) {
+                        layers.push(createParticleLayer(currentFlows));
+                    }
+
+                    deckOverlay.setProps({ layers });
+                }
+
+                animationFrame = requestAnimationFrame(animate);
+            }
+
+            animationFrame = requestAnimationFrame(animate);
+        }
+
+        // Background "track" layer - subtle static arcs
+        function createArcTrackLayer(filteredFlows, opacity = 60) {
+            return new deck.ArcLayer({
+                id: 'arc-track-layer',
+                data: filteredFlows,
+                getSourcePosition: d => d.from,
+                getTargetPosition: d => d.to,
+                getSourceColor: [224, 122, 95, opacity],
+                getTargetColor: [129, 178, 154, opacity],
+                getWidth: d => Math.max(0.5, Math.log(d.returns) * 0.4),
+                greatCircle: true,
+                pickable: false
+            });
+        }
+
+        // Animated particle trails using ArcLayer with animated opacity
+        function createArcLayer(filteredFlows, opacity = 180) {
+            // Create flowing particle effect based on animation time
+            const flowPhase = flowAnimationTime * 0.002; // Controls speed of flow
+
+            return new deck.ArcLayer({
+                id: 'arc-layer',
+                data: filteredFlows,
+                getSourcePosition: d => d.from,
+                getTargetPosition: d => d.to,
+                getSourceColor: d => {
+                    // Highlight hovered arc
+                    if (highlightedArc && d === highlightedArc) {
+                        return [255, 255, 255, 255];
+                    }
+                    // Create wave effect - each arc gets unique phase based on index
+                    const idx = filteredFlows.indexOf(d);
+                    const wave = Math.sin(flowPhase + idx * 0.15);
+                    // Source dims as "particle" travels toward destination
+                    const intensity = wave * 0.4 + 0.6; // 0.2 to 1.0
+                    return [224, 122, 95, Math.floor(opacity * intensity)];
+                },
+                getTargetColor: d => {
+                    if (highlightedArc && d === highlightedArc) {
+                        return [255, 255, 255, 255];
+                    }
+                    // Target brightens as "particle" arrives
+                    const idx = filteredFlows.indexOf(d);
+                    const wave = Math.sin(flowPhase + idx * 0.15 + Math.PI); // Offset for flow
+                    const intensity = wave * 0.4 + 0.6;
+                    return [129, 178, 154, Math.floor(opacity * intensity)];
+                },
+                getWidth: d => {
+                    const base = Math.max(1, Math.log(d.returns) * 0.7);
+                    if (highlightedArc === d) return base * 2.5;
+                    // Width pulses with the flow
+                    const idx = filteredFlows.indexOf(d);
+                    const wave = Math.sin(flowPhase + idx * 0.15);
+                    const pulse = wave * 0.2 + 1; // 0.8 to 1.2
+                    return base * pulse;
+                },
+                // Tilt adds 3D depth to the arcs
+                getTilt: d => {
+                    const idx = filteredFlows.indexOf(d);
+                    return Math.sin(flowPhase * 0.5 + idx * 0.1) * 5; // Subtle sway
+                },
+                greatCircle: true,
+                pickable: true,
+                autoHighlight: true,
+                highlightColor: [255, 255, 255, 200],
+                onHover: (info) => {
+                    highlightedArc = info.object || null;
+                },
+                onClick: (info) => {
+                    if (info.object) {
+                        showCorridorDetail(info.object);
+                    }
+                },
+                updateTriggers: {
+                    getSourceColor: [flowAnimationTime, highlightedArc],
+                    getTargetColor: [flowAnimationTime, highlightedArc],
+                    getWidth: [flowAnimationTime, highlightedArc],
+                    getTilt: [flowAnimationTime]
+                }
+            });
+        }
+
+        // Particle dots that travel along arcs
+        function createParticleLayer(filteredFlows) {
+            // Generate particles at different positions along each arc
+            const particles = [];
+            const numParticlesPerArc = 3;
+            const cycleTime = 3000; // 3 second cycle
+
+            filteredFlows.slice(0, 100).forEach((flow, arcIdx) => {
+                for (let i = 0; i < numParticlesPerArc; i++) {
+                    // Calculate position along arc based on time
+                    const phase = (flowAnimationTime + arcIdx * 200 + i * (cycleTime / numParticlesPerArc)) % cycleTime;
+                    const t = phase / cycleTime; // 0 to 1 along the arc
+
+                    // Interpolate position (simple linear for now)
+                    const lon = flow.from[0] + (flow.to[0] - flow.from[0]) * t;
+                    const lat = flow.from[1] + (flow.to[1] - flow.from[1]) * t;
+
+                    particles.push({
+                        position: [lon, lat],
+                        size: Math.log(flow.returns) * 0.8,
+                        opacity: Math.sin(t * Math.PI) * 200, // Fade in/out at ends
+                        arcIdx
+                    });
+                }
+            });
+
+            return new deck.ScatterplotLayer({
+                id: 'particle-layer',
+                data: particles,
+                getPosition: d => d.position,
+                getRadius: d => d.size * 2000,
+                getFillColor: d => [255, 220, 180, d.opacity],
+                radiusMinPixels: 2,
+                radiusMaxPixels: 6,
+                pickable: false,
+                updateTriggers: {
+                    getPosition: [flowAnimationTime],
+                    getFillColor: [flowAnimationTime]
+                }
+            });
+        }
+
+        // Glow layer for top destinations
+        function createGlowLayer(topCounties) {
+            return new deck.ScatterplotLayer({
+                id: 'glow-layer',
+                data: topCounties,
+                getPosition: d => d.centroid,
+                getRadius: d => Math.sqrt(Math.abs(d.net)) * 50,
+                getFillColor: d => d.net > 0
+                    ? [80, 200, 120, 80]   // Green glow for gainers
+                    : [163, 50, 11, 80],    // Red glow for losers
+                radiusScale: 1,
+                radiusMinPixels: 8,
+                radiusMaxPixels: 40,
+                pickable: false
+            });
+        }
+
+        // Choropleth layer showing net migration by county
+        function createChoroplethLayer() {
+            if (!countyGeoJson || !showChoropleth) return null;
+
+            return new deck.GeoJsonLayer({
+                id: 'county-choropleth',
+                data: countyGeoJson,
+                getFillColor: f => {
+                    const stats = countyStatsMap[f.id];
+                    if (!stats) return [40, 40, 50, 60]; // Default dark
+
+                    const net = stats.net;
+                    // Diverging color scale: green for gain, red for loss
+                    if (net > 8000) return [46, 235, 120, 160];      // Bright green (big gain)
+                    if (net > 3000) return [70, 200, 120, 130];      // Medium green
+                    if (net > 500) return [100, 180, 130, 100];      // Light green
+                    if (net > -500) return [80, 80, 90, 60];         // Neutral gray
+                    if (net > -3000) return [200, 130, 80, 100];     // Light orange
+                    if (net > -8000) return [220, 100, 60, 130];     // Medium orange
+                    return [255, 80, 80, 160];                        // Red (big loss)
+                },
+                getLineColor: [30, 30, 40, 80],
+                getLineWidth: 0.5,
+                lineWidthMinPixels: 0.5,
+                stroked: true,
+                filled: true,
+                pickable: false,
+                opacity: 0.6,
+                // Performance optimizations
+                updateTriggers: {
+                    getFillColor: [countyStatsMap]
+                }
+            });
+        }
+
+        let currentFlows = [];
+
+        function updateMapForStep(step) {
+            if (!deckOverlay || !flowsData.length || isTransitioning) return;
+            isTransitioning = true;
+            currentStep = step;
+
+            let filteredFlows = [];
+            let mapConfig = {
+                center: [-98, 39],
+                zoom: 3.5,
+                pitch: 0,
+                bearing: 0
+            };
+
+            switch(step) {
+                case 1: // California outflows
+                    filteredFlows = flowsData.filter(f => f.from_fips.startsWith('06')).slice(0, 200);
+                    mapConfig = { center: [-119, 36], zoom: 5.2, pitch: 40, bearing: -10 };
+                    break;
+
+                case 2: // Where Californians went (TX, NV, AZ)
+                    filteredFlows = flowsData.filter(f =>
+                        f.from_fips.startsWith('06') &&
+                        (f.to_fips.startsWith('48') || f.to_fips.startsWith('32') || f.to_fips.startsWith('04'))
+                    ).slice(0, 150);
+                    mapConfig = { center: [-110, 34], zoom: 4.5, pitch: 35, bearing: 0 };
+                    break;
+
+                case 3: // Local moves (within-state)
+                    filteredFlows = flowsData.filter(f =>
+                        f.from_fips.substring(0, 2) === f.to_fips.substring(0, 2)
+                    ).slice(0, 300);
+                    mapConfig = { center: [-118, 34], zoom: 6.5, pitch: 25, bearing: 0 };
+                    break;
+
+                case 4: // High income moves (top AGI corridors)
+                    const sortedByAGI = [...flowsData].sort((a, b) => b.agi - a.agi);
+                    filteredFlows = sortedByAGI.slice(0, 150);
+                    mapConfig = { center: [-96, 38], zoom: 3.8, pitch: 40, bearing: 5 };
+                    break;
+
+                case 5: // Winners and losers (all flows, emphasis on Sunbelt)
+                    filteredFlows = flowsData.slice(0, 400);
+                    mapConfig = { center: [-92, 33], zoom: 4.2, pitch: 45, bearing: -5 };
+                    break;
+
+                case 6: // Remote work effect - tech hub outflows
+                    // SF, Seattle, NYC tech corridors
+                    filteredFlows = flowsData.filter(f =>
+                        (f.from_fips.startsWith('06075') || // SF
+                         f.from_fips.startsWith('53033') || // King County (Seattle)
+                         f.from_fips.startsWith('36061')) && // Manhattan
+                        (f.to_fips.startsWith('48') || // Texas
+                         f.to_fips.startsWith('08') || // Colorado
+                         f.to_fips.startsWith('16'))   // Idaho
+                    ).slice(0, 150);
+                    // Fall back to any tech hub outflows if filter is too restrictive
+                    if (filteredFlows.length < 30) {
+                        filteredFlows = flowsData.filter(f =>
+                            f.from_fips.startsWith('06') &&
+                            (f.to_fips.startsWith('48') || f.to_fips.startsWith('08'))
+                        ).slice(0, 150);
+                    }
+                    mapConfig = { center: [-105, 38], zoom: 4.5, pitch: 40, bearing: 10 };
+                    break;
+
+                case 7: // Retirement belt - Northern to FL/AZ
+                    filteredFlows = flowsData.filter(f =>
+                        (f.to_fips.startsWith('12') || f.to_fips.startsWith('04')) && // FL or AZ
+                        (f.from_fips.startsWith('36') || // NY
+                         f.from_fips.startsWith('17') || // IL
+                         f.from_fips.startsWith('26') || // MI
+                         f.from_fips.startsWith('39') || // OH
+                         f.from_fips.startsWith('42'))   // PA
+                    ).slice(0, 200);
+                    mapConfig = { center: [-88, 35], zoom: 4, pitch: 35, bearing: -5 };
+                    break;
+
+                case 8: // Boomerang - bidirectional flows
+                    // Find flows where reverse also exists
+                    const reverseMap = new Map();
+                    flowsData.forEach(f => {
+                        reverseMap.set(`${f.to_fips}-${f.from_fips}`, f);
+                    });
+                    filteredFlows = flowsData.filter(f =>
+                        reverseMap.has(`${f.from_fips}-${f.to_fips}`)
+                    ).slice(0, 250);
+                    mapConfig = { center: [-98, 38], zoom: 3.8, pitch: 30, bearing: 0 };
+                    break;
+
+                default:
+                    filteredFlows = flowsData.slice(0, 300);
+            }
+
+            // CINEMATIC TRANSITION: Fade out -> Move -> Fade in
+            // Step 1: Fade out current arcs (pause animation during transition)
+            arcOpacity = 0;
+
+            // Step 2: Start camera movement after brief pause
+            setTimeout(() => {
+                // Update the flows while camera is moving
+                currentFlows = filteredFlows;
+
+                map.flyTo({
+                    center: mapConfig.center,
+                    zoom: mapConfig.zoom,
+                    pitch: mapConfig.pitch,
+                    bearing: mapConfig.bearing,
+                    duration: 1800,
+                    essential: true
+                });
+            }, 150);
+
+            // Step 3: Fade in new arcs after camera starts moving
+            setTimeout(() => {
+                arcOpacity = 180;
+                isTransitioning = false;
+                // Animation loop will pick up the new flows automatically
+            }, 1100);
+        }
+
+        // ============================================
+        // SCROLLAMA SETUP - Enhanced
+        // ============================================
+
+        function initScrollama() {
+            const scroller = scrollama();
+
+            scroller
+                .setup({
+                    step: '.step',
+                    offset: 0.5,
+                    progress: true
+                })
+                .onStepEnter(response => {
+                    const step = parseInt(response.element.dataset.step);
+                    updateMapForStep(step);
+
+                    // Update step styling
+                    document.querySelectorAll('.step').forEach(s => s.classList.remove('is-active'));
+                    response.element.classList.add('is-active');
+
+                    // Update progress dots
+                    document.querySelectorAll('.step-dot').forEach(dot => {
+                        dot.classList.toggle('active', parseInt(dot.dataset.step) === step);
+                    });
+
+                    // Show/hide choropleth legend for steps 4+
+                    const choroplethLegend = document.getElementById('choropleth-legend');
+                    if (choroplethLegend) {
+                        choroplethLegend.style.display = step >= 4 ? 'block' : 'none';
+                    }
+
+                    // Update URL state
+                    updateURL();
+
+                    // Announce to screen reader
+                    const stepTitle = response.element.querySelector('.step__title')?.textContent;
+                    if (stepTitle) {
+                        announceToScreenReader(`Step ${step} of 8: ${stepTitle}`);
+                    }
+                });
+
+            // Progress dot click handlers
+            document.querySelectorAll('.step-dot').forEach(dot => {
+                dot.addEventListener('click', () => {
+                    const step = parseInt(dot.dataset.step);
+                    document.querySelector(`.step[data-step="${step}"]`).scrollIntoView({
+                        behavior: 'smooth'
+                    });
+                });
+            });
+
+            window.addEventListener('resize', scroller.resize);
+        }
+
+        // ============================================
+        // COUNTY EXPLORER - Enhanced
+        // ============================================
+
+        function initExplorer() {
+            const searchInput = document.getElementById('county-search');
+            const searchResults = document.getElementById('search-results');
+
+            searchInput.addEventListener('input', (e) => {
+                const query = e.target.value.toLowerCase();
+
+                if (query.length < 2) {
+                    searchResults.classList.remove('active');
+                    return;
+                }
+
+                const matches = countyStats
+                    .filter(c => c.name && c.name.toLowerCase().includes(query))
+                    .slice(0, 8);
+
+                if (matches.length > 0) {
+                    searchResults.innerHTML = matches.map(c => {
+                        const stateFips = c.fips.substring(0, 2);
+                        const stateName = STATE_NAMES[stateFips] || stateFips;
+                        const countyName = c.name.replace(/, \d+$/, '');
+                        return `<div class="search-result-item" data-fips="${c.fips}">${countyName}, ${stateName}</div>`;
+                    }).join('');
+                    searchResults.classList.add('active');
+
+                    document.querySelectorAll('.search-result-item').forEach(item => {
+                        item.addEventListener('click', () => {
+                            selectCounty(item.dataset.fips);
+                            searchResults.classList.remove('active');
+                            searchInput.value = item.textContent;
+                        });
+                    });
+                } else {
+                    searchResults.classList.remove('active');
+                }
+            });
+
+            // Keyboard navigation
+            searchInput.addEventListener('keydown', (e) => {
+                const items = document.querySelectorAll('.search-result-item');
+                const active = document.querySelector('.search-result-item:hover');
+
+                if (e.key === 'Enter' && items.length > 0) {
+                    const first = items[0];
+                    selectCounty(first.dataset.fips);
+                    searchResults.classList.remove('active');
+                    searchInput.value = first.textContent;
+                }
+            });
+
+            document.addEventListener('click', (e) => {
+                if (!e.target.closest('.search-container')) {
+                    searchResults.classList.remove('active');
+                }
+            });
+
+            // Share button
+            document.getElementById('share-btn').addEventListener('click', shareCurrentView);
+
+            // Geolocation button
+            document.getElementById('geolocate-btn').addEventListener('click', findMyCounty);
+        }
+
+        // ============================================
+        // GEOLOCATION - Find My County
+        // ============================================
+
+        async function findMyCounty() {
+            const btn = document.getElementById('geolocate-btn');
+            btn.classList.add('loading');
+            btn.classList.remove('pulse');
+            btn.querySelector('span:last-child').textContent = 'Locating...';
+
+            try {
+                const pos = await new Promise((resolve, reject) => {
+                    navigator.geolocation.getCurrentPosition(resolve, reject, {
+                        enableHighAccuracy: false,
+                        timeout: 10000,
+                        maximumAge: 300000
+                    });
+                });
+
+                const { latitude, longitude } = pos.coords;
+                const county = findCountyByCoords(longitude, latitude);
+
+                if (county) {
+                    selectCounty(county.fips);
+                    showToast(`Found: ${county.name.replace(/, \d+$/, '')}`);
+                } else {
+                    showToast('Could not determine your county');
+                }
+            } catch (err) {
+                console.error('Geolocation error:', err);
+                showToast('Location access denied or unavailable');
+            } finally {
+                btn.classList.remove('loading');
+                btn.querySelector('span:last-child').textContent = 'Find My County';
+            }
+        }
+
+        // Simple point-in-polygon for county lookup
+        function findCountyByCoords(lon, lat) {
+            if (!countyGeoJson) return null;
+
+            for (const feature of countyGeoJson.features) {
+                if (pointInPolygon([lon, lat], feature.geometry)) {
+                    return countyStatsMap[feature.id];
+                }
+            }
+            return null;
+        }
+
+        function pointInPolygon(point, geometry) {
+            const [px, py] = point;
+
+            function checkRing(ring) {
+                let inside = false;
+                for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+                    const [xi, yi] = ring[i];
+                    const [xj, yj] = ring[j];
+                    if (((yi > py) !== (yj > py)) && (px < (xj - xi) * (py - yi) / (yj - yi) + xi)) {
+                        inside = !inside;
+                    }
+                }
+                return inside;
+            }
+
+            if (geometry.type === 'Polygon') {
+                return checkRing(geometry.coordinates[0]);
+            } else if (geometry.type === 'MultiPolygon') {
+                for (const poly of geometry.coordinates) {
+                    if (checkRing(poly[0])) return true;
+                }
+            }
+            return false;
+        }
+
+        function showToast(message) {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 3000);
+        }
+
+        // ============================================
+        // RANKING & PERCENTILES
+        // ============================================
+
+        let rankings = null;
+
+        function calculateRankings() {
+            if (!countyStats.length) return;
+
+            const sortedByNet = [...countyStats].sort((a, b) => b.net - a.net);
+            const sortedByAgi = [...countyStats].sort((a, b) => (b.agi_net || 0) - (a.agi_net || 0));
+            const sortedByInflow = [...countyStats].sort((a, b) => b.inflow - a.inflow);
+            const sortedByOutflow = [...countyStats].sort((a, b) => b.outflow - a.outflow);
+
+            rankings = {
+                net: new Map(sortedByNet.map((c, i) => [c.fips, i + 1])),
+                agi: new Map(sortedByAgi.map((c, i) => [c.fips, i + 1])),
+                inflow: new Map(sortedByInflow.map((c, i) => [c.fips, i + 1])),
+                outflow: new Map(sortedByOutflow.map((c, i) => [c.fips, i + 1]))
+            };
+        }
+
+        function getPercentile(fips, metric) {
+            if (!rankings || !rankings[metric]) return null;
+            const rank = rankings[metric].get(fips);
+            if (!rank) return null;
+            const total = countyStats.length;
+            return Math.round((1 - rank / total) * 100);
+        }
+
+        function formatPercentile(percentile, metric, value) {
+            if (percentile === null) return '';
+
+            if (metric === 'net') {
+                if (value > 0) {
+                    return `Top ${100 - percentile}% for population gain`;
+                } else {
+                    return `More outflow than ${percentile}% of counties`;
+                }
+            } else if (metric === 'agi') {
+                if (value > 0) {
+                    return `Top ${100 - percentile}% for income gain`;
+                } else {
+                    return `More income loss than ${100 - percentile}% of counties`;
+                }
+            } else if (metric === 'inflow') {
+                return `Top ${100 - percentile}% for inbound migration`;
+            } else if (metric === 'outflow') {
+                return `Top ${100 - percentile}% for outbound migration`;
+            }
+            return '';
+        }
+
+        // ============================================
+        // COUNTY STORY GENERATION
+        // ============================================
+
+        function generateCountyStory(fips) {
+            const county = countyStatsMap[fips];
+            if (!county) return '';
+
+            const countyName = county.name.replace(/, \d+$/, '');
+            const topOrigins = flowsData.filter(f => f.to_fips === fips).slice(0, 3);
+            const topDests = flowsData.filter(f => f.from_fips === fips).slice(0, 3);
+            const netPct = getPercentile(fips, 'net');
+            const agiNet = county.agi_net || (county.agi_in - county.agi_out);
+
+            function formatMoney(n) {
+                if (Math.abs(n) >= 1e9) return '$' + (n / 1e9).toFixed(1) + ' billion';
+                if (Math.abs(n) >= 1e6) return '$' + (n / 1e6).toFixed(0) + ' million';
+                return '$' + n.toLocaleString();
+            }
+
+            let story = '';
+
+            if (county.net > 0) {
+                story = `<strong>${countyName}</strong> gained <strong>${county.net.toLocaleString()} households</strong> in 2021-22`;
+
+                if (netPct !== null && netPct >= 90) {
+                    story += `—placing it in the <strong>top ${100 - netPct}%</strong> of all US counties for population gain`;
+                }
+                story += '. ';
+
+                if (topOrigins.length >= 2) {
+                    story += `Most newcomers arrived from <strong>${topOrigins[0].from_name}</strong>`;
+                    if (topOrigins.length > 1) {
+                        story += ` and <strong>${topOrigins[1].from_name}</strong>`;
+                    }
+                    story += '. ';
+                }
+
+                if (agiNet > 0) {
+                    story += `The county attracted <strong>${formatMoney(agiNet)}</strong> in new taxable income.`;
+                }
+            } else {
+                story = `<strong>${countyName}</strong> saw <strong>${Math.abs(county.net).toLocaleString()} households</strong> leave in 2021-22. `;
+
+                if (topDests.length >= 2) {
+                    story += `Most departed for <strong>${topDests[0].to_name}</strong> and <strong>${topDests[1].to_name}</strong>. `;
+                }
+
+                if (agiNet < 0) {
+                    story += `The county lost <strong>${formatMoney(Math.abs(agiNet))}</strong> in taxable income.`;
+                }
+            }
+
+            return story;
+        }
+
+        // ============================================
+        // FLOW LISTS (Origins/Destinations)
+        // ============================================
+
+        function updateFlowLists(fips) {
+            const inflows = flowsData.filter(f => f.to_fips === fips).slice(0, 6);
+            const outflows = flowsData.filter(f => f.from_fips === fips).slice(0, 6);
+
+            const inflowList = document.getElementById('inflow-list');
+            const outflowList = document.getElementById('outflow-list');
+
+            inflowList.innerHTML = inflows.map((f, i) => `
+                <div class="flow-list__item" data-from="${f.from_fips}" data-to="${f.to_fips}">
+                    <span class="flow-list__rank">${i + 1}.</span>
+                    <span class="flow-list__name">${f.from_name}</span>
+                    <span class="flow-list__value">${f.returns.toLocaleString()}</span>
+                </div>
+            `).join('') || '<div style="opacity: 0.5; padding: 1rem 0;">No inflow data</div>';
+
+            outflowList.innerHTML = outflows.map((f, i) => `
+                <div class="flow-list__item" data-from="${f.from_fips}" data-to="${f.to_fips}">
+                    <span class="flow-list__rank">${i + 1}.</span>
+                    <span class="flow-list__name">${f.to_name}</span>
+                    <span class="flow-list__value">${f.returns.toLocaleString()}</span>
+                </div>
+            `).join('') || '<div style="opacity: 0.5; padding: 1rem 0;">No outflow data</div>';
+
+            // Add click handlers to highlight on map
+            document.querySelectorAll('.flow-list__item').forEach(item => {
+                item.addEventListener('click', () => {
+                    const fromFips = item.dataset.from;
+                    const toFips = item.dataset.to;
+                    highlightCorridorOnMap(fromFips, toFips);
+                });
+            });
+
+            document.getElementById('flow-lists').classList.add('active');
+        }
+
+        function highlightCorridorOnMap(fromFips, toFips) {
+            const flow = flowsData.find(f => f.from_fips === fromFips && f.to_fips === toFips);
+            if (flow) {
+                // Scroll to map section
+                document.querySelector('.scrolly__graphic').scrollIntoView({ behavior: 'smooth' });
+
+                // After scroll, highlight this corridor
+                setTimeout(() => {
+                    currentFlows = [flow];
+                    arcOpacity = 255;
+
+                    const bounds = [
+                        [Math.min(flow.from[0], flow.to[0]) - 2, Math.min(flow.from[1], flow.to[1]) - 2],
+                        [Math.max(flow.from[0], flow.to[0]) + 2, Math.max(flow.from[1], flow.to[1]) + 2]
+                    ];
+                    map.fitBounds(bounds, { padding: 100, duration: 1500 });
+
+                    showCorridorDetail(flow);
+                }, 500);
+            }
+        }
+
+        // ============================================
+        // SIMILAR COUNTIES
+        // ============================================
+
+        function findSimilarCounties(fips, count = 5) {
+            const county = countyStatsMap[fips];
+            if (!county) return [];
+
+            return countyStats
+                .filter(c => c.fips !== fips && c.centroid)
+                .map(c => ({
+                    ...c,
+                    similarity: Math.abs(c.net - county.net) + Math.abs(c.inflow - county.inflow) * 0.5
+                }))
+                .sort((a, b) => a.similarity - b.similarity)
+                .slice(0, count);
+        }
+
+        function updateSimilarCounties(fips) {
+            const similar = findSimilarCounties(fips);
+            const container = document.getElementById('similar-list');
+
+            container.innerHTML = similar.map(c => {
+                const stateFips = c.fips.substring(0, 2);
+                const stateName = STATE_NAMES[stateFips] || '';
+                const countyName = c.name.replace(/, \d+$/, '');
+                const netDisplay = c.net > 0 ? `+${c.net.toLocaleString()}` : c.net.toLocaleString();
+
+                return `<div class="similar-county-chip" data-fips="${c.fips}">
+                    ${countyName}, ${stateName}
+                    <span class="net">${netDisplay}</span>
+                </div>`;
+            }).join('');
+
+            // Add click handlers
+            container.querySelectorAll('.similar-county-chip').forEach(chip => {
+                chip.addEventListener('click', () => {
+                    selectCounty(chip.dataset.fips);
+                    document.getElementById('county-card').scrollIntoView({ behavior: 'smooth' });
+                });
+            });
+
+            document.getElementById('similar-counties').classList.add('active');
+        }
+
+        // ============================================
+        // MINI-MAP
+        // ============================================
+
+        let miniMapProjection = null;
+        let miniMapPath = null;
+        let statesGeoJson = null;
+
+        async function initMiniMap() {
+            // We'll use a simplified approach - just highlight the county location
+            // Full state outlines would require loading another GeoJSON
+            miniMapProjection = d3.geoAlbersUsa()
+                .scale(1100)
+                .translate([480, 300]);
+            miniMapPath = d3.geoPath().projection(miniMapProjection);
+        }
+
+        function updateMiniMap(fips) {
+            const county = countyStatsMap[fips];
+            if (!county || !county.centroid) return;
+
+            const svg = d3.select('#mini-map');
+            svg.selectAll('*').remove();
+
+            // Draw US outline (simple rectangle for now)
+            svg.append('rect')
+                .attr('x', 80)
+                .attr('y', 80)
+                .attr('width', 800)
+                .attr('height', 440)
+                .attr('fill', 'rgba(255,255,255,0.02)')
+                .attr('rx', 8);
+
+            // Project county centroid
+            const projected = miniMapProjection(county.centroid);
+            if (!projected) return;
+
+            // Draw pulsing marker
+            const g = svg.append('g');
+
+            // Outer glow
+            g.append('circle')
+                .attr('cx', projected[0])
+                .attr('cy', projected[1])
+                .attr('r', 20)
+                .attr('fill', 'rgba(224, 122, 95, 0.2)')
+                .attr('class', 'county-marker-glow');
+
+            // Inner marker
+            g.append('circle')
+                .attr('cx', projected[0])
+                .attr('cy', projected[1])
+                .attr('r', 6)
+                .attr('fill', '#E07A5F')
+                .attr('class', 'county-marker');
+
+            // State label
+            const stateFips = fips.substring(0, 2);
+            const stateName = STATE_NAMES[stateFips] || '';
+            svg.append('text')
+                .attr('x', projected[0])
+                .attr('y', projected[1] + 25)
+                .attr('text-anchor', 'middle')
+                .attr('fill', 'rgba(255,255,255,0.5)')
+                .attr('font-size', '11px')
+                .attr('font-family', 'IBM Plex Sans, sans-serif')
+                .text(stateName);
+        }
+
+        // ============================================
+        // ANIMATED COUNTER
+        // ============================================
+
+        function animateCounterUp(element, target, duration = 500, prefix = '', suffix = '') {
+            const startTime = performance.now();
+            const startValue = 0;
+
+            function update(currentTime) {
+                const elapsed = currentTime - startTime;
+                const progress = Math.min(elapsed / duration, 1);
+                const eased = 1 - Math.pow(1 - progress, 3); // Ease out cubic
+
+                const current = Math.round(startValue + (target - startValue) * eased);
+                element.textContent = prefix + current.toLocaleString() + suffix;
+
+                if (progress < 1) {
+                    requestAnimationFrame(update);
+                }
+            }
+
+            requestAnimationFrame(update);
+        }
+
+        // Initialize from URL state
+        function initFromURL() {
+            const state = readURLState();
+
+            // If county is in URL, scroll to explorer and select it
+            if (state.county) {
+                setTimeout(() => {
+                    const county = countyStats.find(c => c.fips === state.county);
+                    if (county) {
+                        document.getElementById('explorer').scrollIntoView({ behavior: 'smooth' });
+                        setTimeout(() => selectCounty(state.county), 500);
+                    }
+                }, 1000);
+            }
+            // If step is in URL, scroll to that step
+            else if (state.step) {
+                setTimeout(() => {
+                    const stepEl = document.querySelector(`.step[data-step="${state.step}"]`);
+                    if (stepEl) {
+                        stepEl.scrollIntoView({ behavior: 'smooth' });
+                    }
+                }, 1000);
+            }
+        }
+
+        // Keyboard navigation
+        function initKeyboardNav() {
+            document.addEventListener('keydown', (e) => {
+                // Ignore if user is typing in search
+                if (document.activeElement.tagName === 'INPUT') return;
+
+                switch (e.key) {
+                    case 'ArrowDown':
+                    case 'ArrowRight':
+                        e.preventDefault();
+                        navigateStep(1);
+                        break;
+                    case 'ArrowUp':
+                    case 'ArrowLeft':
+                        e.preventDefault();
+                        navigateStep(-1);
+                        break;
+                    case 'Escape':
+                        // Clear county selection
+                        selectedCountyFips = null;
+                        document.getElementById('county-card').classList.remove('active');
+                        document.getElementById('chord-placeholder').style.display = 'block';
+                        document.getElementById('share-btn').style.display = 'none';
+                        document.querySelector('#chord-diagram').innerHTML = '';
+                        updateURL();
+                        break;
+                    case '1':
+                    case '2':
+                    case '3':
+                    case '4':
+                    case '5':
+                    case '6':
+                    case '7':
+                    case '8':
+                        // Jump to specific step
+                        const stepNum = parseInt(e.key);
+                        const targetStep = document.querySelector(`.step[data-step="${stepNum}"]`);
+                        if (targetStep) {
+                            targetStep.scrollIntoView({ behavior: 'smooth' });
+                        }
+                        break;
+                }
+            });
+        }
+
+        function navigateStep(direction) {
+            const maxStep = 8;
+            const newStep = Math.max(1, Math.min(maxStep, currentStep + direction));
+            if (newStep !== currentStep) {
+                const targetStep = document.querySelector(`.step[data-step="${newStep}"]`);
+                if (targetStep) {
+                    targetStep.scrollIntoView({ behavior: 'smooth' });
+                }
+            }
+        }
+
+        function announceToScreenReader(message) {
+            const announcer = document.getElementById('sr-announcer');
+            if (announcer) {
+                announcer.textContent = message;
+            }
+        }
+
+        function showKeyboardHint() {
+            const hint = document.getElementById('keyboard-hint');
+            if (hint) {
+                hint.classList.add('show');
+                setTimeout(() => hint.classList.remove('show'), 4000);
+            }
+        }
+
+        // Corridor detail modal
+        let selectedCorridor = null;
+
+        function showCorridorDetail(flow) {
+            selectedCorridor = flow;
+            const modal = document.getElementById('corridor-modal');
+
+            // Set title
+            document.getElementById('corridor-title').textContent =
+                `${flow.from_name} → ${flow.to_name}`;
+
+            // Set stats
+            document.getElementById('corridor-returns').textContent =
+                flow.returns.toLocaleString();
+            document.getElementById('corridor-income').textContent =
+                `$${(flow.agi / 1000000).toFixed(1)}M`;
+
+            // Find reverse flow
+            const reverseFlow = flowsData.find(f =>
+                f.from_fips === flow.to_fips && f.to_fips === flow.from_fips
+            );
+
+            if (reverseFlow) {
+                document.getElementById('corridor-reverse').style.display = 'flex';
+                document.getElementById('corridor-reverse-value').textContent =
+                    `${reverseFlow.returns.toLocaleString()} households`;
+            } else {
+                document.getElementById('corridor-reverse').style.display = 'none';
+            }
+
+            // Show modal
+            modal.classList.add('active');
+
+            // Zoom to corridor
+            const bounds = [
+                [Math.min(flow.from[0], flow.to[0]) - 2, Math.min(flow.from[1], flow.to[1]) - 2],
+                [Math.max(flow.from[0], flow.to[0]) + 2, Math.max(flow.from[1], flow.to[1]) + 2]
+            ];
+            map.fitBounds(bounds, { padding: 100, duration: 1000 });
+        }
+
+        function hideCorridorDetail() {
+            selectedCorridor = null;
+            document.getElementById('corridor-modal').classList.remove('active');
+        }
+
+        // Easter egg: fun facts on repeated hero stat clicks
+        let heroClickCount = 0;
+        const funFacts = [
+            "If all 6.5 million movers held hands, they'd circle the Earth twice!",
+            "The $558 billion in moved income is more than Finland's entire GDP.",
+            "The most popular moving day? Saturday. The least? Wednesday.",
+            "Texas gained more households than the entire population of Wyoming.",
+            "The average mover traveled 180 miles from their old address."
+        ];
+
+        function initEasterEgg() {
+            const heroStats = document.querySelector('.hero-stats');
+            heroStats.addEventListener('click', () => {
+                heroClickCount++;
+                if (heroClickCount >= 5) {
+                    heroClickCount = 0;
+                    showFunFact();
+                }
+            });
+        }
+
+        function showFunFact() {
+            const fact = funFacts[Math.floor(Math.random() * funFacts.length)];
+            document.getElementById('fun-fact-text').textContent = fact;
+            const el = document.getElementById('fun-fact');
+            el.classList.add('show');
+            setTimeout(() => el.classList.remove('show'), 4000);
+        }
+
+        function initCorridorModal() {
+            document.getElementById('corridor-close').addEventListener('click', hideCorridorDetail);
+
+            // Click on backdrop closes modal
+            document.getElementById('corridor-modal').addEventListener('click', (e) => {
+                if (e.target.classList.contains('corridor-modal')) {
+                    hideCorridorDetail();
+                }
+            });
+
+            // Escape key closes modal
+            document.addEventListener('keydown', (e) => {
+                if (e.key === 'Escape' && selectedCorridor) {
+                    hideCorridorDetail();
+                }
+            });
+        }
+
+        function selectCounty(fips) {
+            const county = countyStats.find(c => c.fips === fips);
+            if (!county) return;
+
+            selectedCountyFips = fips;
+            updateURL();
+
+            const stateFips = fips.substring(0, 2);
+            const stateName = STATE_NAMES[stateFips] || stateFips;
+            const countyName = county.name.replace(/, \d+$/, '');
+
+            // Show card with animation
+            document.getElementById('county-card').classList.add('active');
+            document.getElementById('selected-county-name').textContent = countyName;
+            document.getElementById('selected-county-state').textContent = stateName;
+
+            // Animated counters for stats
+            const inflowEl = document.getElementById('county-inflow');
+            const outflowEl = document.getElementById('county-outflow');
+            const netEl = document.getElementById('county-net');
+            const agiEl = document.getElementById('county-agi');
+
+            // Animate inflow/outflow
+            animateCounterUp(inflowEl, county.inflow, 600);
+            animateCounterUp(outflowEl, county.outflow, 600);
+
+            // Animate net with sign
+            setTimeout(() => {
+                const prefix = county.net > 0 ? '+' : '';
+                animateCounterUp(netEl, Math.abs(county.net), 500, prefix);
+                netEl.className = 'county-stat-value ' + (county.net >= 0 ? 'positive' : 'negative');
+            }, 200);
+
+            // Animate AGI
+            const agiNet = county.agi_net || (county.agi_in - county.agi_out);
+            setTimeout(() => {
+                if (Math.abs(agiNet) >= 1000000000) {
+                    agiEl.textContent = (agiNet > 0 ? '+$' : '-$') + (Math.abs(agiNet) / 1000000000).toFixed(1) + 'B';
+                } else {
+                    agiEl.textContent = (agiNet > 0 ? '+$' : '-$') + (Math.abs(agiNet) / 1000000).toFixed(0) + 'M';
+                }
+                agiEl.className = 'county-stat-value ' + (agiNet >= 0 ? 'positive' : 'negative');
+            }, 400);
+
+            // Add percentile context
+            const inflowPct = getPercentile(fips, 'inflow');
+            const outflowPct = getPercentile(fips, 'outflow');
+            const netPct = getPercentile(fips, 'net');
+            const agiPct = getPercentile(fips, 'agi');
+
+            document.getElementById('county-inflow-pct').textContent = formatPercentile(inflowPct, 'inflow', county.inflow);
+            document.getElementById('county-outflow-pct').textContent = formatPercentile(outflowPct, 'outflow', county.outflow);
+
+            const netPctEl = document.getElementById('county-net-pct');
+            netPctEl.textContent = formatPercentile(netPct, 'net', county.net);
+            netPctEl.className = 'county-stat-percentile' + (netPct >= 80 && county.net > 0 ? ' highlight' : '');
+
+            const agiPctEl = document.getElementById('county-agi-pct');
+            agiPctEl.textContent = formatPercentile(agiPct, 'agi', agiNet);
+            agiPctEl.className = 'county-stat-percentile' + (agiPct >= 80 && agiNet > 0 ? ' highlight' : '');
+
+            // Update mini-map
+            updateMiniMap(fips);
+
+            // Generate and display county story
+            const story = generateCountyStory(fips);
+            const storyEl = document.getElementById('county-story');
+            storyEl.innerHTML = story;
+            storyEl.classList.add('active');
+
+            // Update flow lists
+            updateFlowLists(fips);
+
+            // Update similar counties
+            updateSimilarCounties(fips);
+
+            // Show chord diagram
+            document.getElementById('chord-placeholder').style.display = 'none';
+            document.getElementById('share-btn').style.display = 'flex';
+            drawChordDiagram(fips);
+        }
+
+        function drawChordDiagram(fips) {
+            const inflows = flowsData.filter(f => f.to_fips === fips).slice(0, 8);
+            const outflows = flowsData.filter(f => f.from_fips === fips).slice(0, 8);
+
+            const svg = d3.select('#chord-diagram');
+            svg.selectAll('*').remove();
+
+            const width = 380;
+            const height = 380;
+            const innerRadius = 90;
+            const outerRadius = 130;
+
+            svg.attr('viewBox', `0 0 ${width} ${height}`);
+
+            const g = svg.append('g')
+                .attr('transform', `translate(${width/2}, ${height/2})`);
+
+            const selectedCounty = countyStats.find(c => c.fips === fips);
+            const countyName = selectedCounty ? selectedCounty.name.replace(/, \d+$/, '').split(' ')[0] : 'Selected';
+
+            // Center label
+            g.append('text')
+                .attr('text-anchor', 'middle')
+                .attr('dy', '0.35em')
+                .attr('fill', '#FAF8F5')
+                .attr('font-size', '16px')
+                .attr('font-family', 'EB Garamond, serif')
+                .text(countyName);
+
+            const arc = d3.arc()
+                .innerRadius(innerRadius)
+                .outerRadius(outerRadius);
+
+            // Draw inflow arcs with staggered animation
+            const totalIn = d3.sum(inflows, d => d.returns) || 1;
+            let inStartAngle = -Math.PI / 2;
+
+            inflows.forEach((flow, i) => {
+                const angle = (flow.returns / totalIn) * Math.PI;
+                const path = g.append('path')
+                    .attr('d', arc({
+                        startAngle: inStartAngle,
+                        endAngle: inStartAngle + angle
+                    }))
+                    .attr('fill', `rgba(129, 178, 154, ${0.9 - i * 0.08})`)
+                    .attr('opacity', 0)
+                    .style('cursor', 'pointer');
+
+                // Staggered fade-in animation
+                path.transition()
+                    .delay(i * 80)
+                    .duration(400)
+                    .attr('opacity', 1);
+
+                // Tooltip
+                path.append('title')
+                    .text(`From ${flow.from_name}: ${flow.returns.toLocaleString()} returns`);
+
+                inStartAngle += angle;
+            });
+
+            // Draw outflow arcs with staggered animation
+            const totalOut = d3.sum(outflows, d => d.returns) || 1;
+            let outStartAngle = Math.PI / 2;
+
+            outflows.forEach((flow, i) => {
+                const angle = (flow.returns / totalOut) * Math.PI;
+                const path = g.append('path')
+                    .attr('d', arc({
+                        startAngle: outStartAngle,
+                        endAngle: outStartAngle + angle
+                    }))
+                    .attr('fill', `rgba(224, 122, 95, ${0.9 - i * 0.08})`)
+                    .attr('opacity', 0)
+                    .style('cursor', 'pointer');
+
+                path.transition()
+                    .delay(inflows.length * 80 + i * 80)
+                    .duration(400)
+                    .attr('opacity', 1);
+
+                path.append('title')
+                    .text(`To ${flow.to_name}: ${flow.returns.toLocaleString()} returns`);
+
+                outStartAngle += angle;
+            });
+
+            // Labels with fade-in
+            g.append('text')
+                .attr('y', -outerRadius - 18)
+                .attr('text-anchor', 'middle')
+                .attr('fill', '#81B29A')
+                .attr('font-size', '11px')
+                .attr('font-weight', '500')
+                .attr('text-transform', 'uppercase')
+                .attr('letter-spacing', '0.1em')
+                .attr('opacity', 0)
+                .text('Inbound')
+                .transition()
+                .delay(600)
+                .duration(300)
+                .attr('opacity', 1);
+
+            g.append('text')
+                .attr('y', outerRadius + 28)
+                .attr('text-anchor', 'middle')
+                .attr('fill', '#E07A5F')
+                .attr('font-size', '11px')
+                .attr('font-weight', '500')
+                .attr('text-transform', 'uppercase')
+                .attr('letter-spacing', '0.1em')
+                .attr('opacity', 0)
+                .text('Outbound')
+                .transition()
+                .delay(600)
+                .duration(300)
+                .attr('opacity', 1);
+        }
+
+        // ============================================
+        // INITIALIZATION
+        // ============================================
+
+        let mapLoaded = false;
+        let dataLoaded = false;
+
+        function tryInitializeMap() {
+            if (mapLoaded && dataLoaded && flowsData.length > 0) {
+                console.log('Both map and data ready, initializing deck.gl overlay');
+                initDeckOverlay();
+            }
+        }
+
+        async function loadData() {
+            try {
+                console.log('Loading data...');
+                const [flowsRes, statsRes, summaryRes, geoRes] = await Promise.all([
+                    fetch('flows_top1000.json'),
+                    fetch('county_stats.json'),
+                    fetch('summary.json'),
+                    fetch('us-counties.json')
+                ]);
+
+                flowsData = await flowsRes.json();
+                countyStats = await statsRes.json();
+                summaryData = await summaryRes.json();
+                countyGeoJson = await geoRes.json();
+
+                // Build lookup map for fast access
+                countyStats.forEach(stat => {
+                    countyStatsMap[stat.fips] = stat;
+                });
+
+                console.log(`Loaded ${flowsData.length} flows, ${countyStats.length} counties, ${countyGeoJson.features.length} polygons`);
+                dataLoaded = true;
+
+                // Pre-calculate rankings for percentile display
+                calculateRankings();
+
+                // Initialize mini-map projection
+                initMiniMap();
+
+                initScrollama();
+                initExplorer();
+                initKeyboardNav();
+                initCorridorModal();
+                initEasterEgg();
+                tryInitializeMap();
+                initFromURL();
+
+                // Animate hero counters
+                setTimeout(() => {
+                    animateCounter(document.getElementById('stat-returns'), 6548327, '', '');
+                    animateCounter(document.getElementById('stat-income'), 558000000000, '$', '');
+                    // Show keyboard hint after hero animation
+                    setTimeout(showKeyboardHint, 2000);
+                }, 600);
+
+            } catch (error) {
+                console.error('Error loading data:', error);
+                document.getElementById('stat-returns').textContent = 'Error loading data';
+                document.getElementById('stat-income').textContent = 'Check console';
+            }
+        }
+
+        function initMapBase() {
+            console.log('Initializing map...');
+            map = new maplibregl.Map({
+                container: 'map-container',
+                style: {
+                    version: 8,
+                    sources: {
+                        'carto': {
+                            type: 'raster',
+                            tiles: ['https://basemaps.cartocdn.com/dark_all/{z}/{x}/{y}@2x.png'],
+                            tileSize: 256,
+                            attribution: '&copy; CARTO'
+                        }
+                    },
+                    layers: [{
+                        id: 'carto-layer',
+                        type: 'raster',
+                        source: 'carto'
+                    }]
+                },
+                center: [-98, 39],
+                zoom: 3.5,
+                pitch: 0,
+                bearing: 0,
+                maxPitch: 60
+            });
+
+            map.on('load', () => {
+                console.log('Map loaded');
+                mapLoaded = true;
+                tryInitializeMap();
+            });
+
+            map.on('error', (e) => {
+                console.error('Map error:', e);
+            });
+        }
+
+        // Start everything
+        document.addEventListener('DOMContentLoaded', () => {
+            initMapBase();
+            loadData();
+        });
+    </script>
+</body>
+</html>

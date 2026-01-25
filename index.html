@@ -1,0 +1,697 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Follow the Money: Where Americans Actually Move</title>
+
+    <!-- MapLibre GL JS (free, no token needed) -->
+    <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet">
+    <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
+
+    <!-- deck.gl -->
+    <script src="https://unpkg.com/deck.gl@latest/dist.min.js"></script>
+
+    <!-- Google Fonts: EB Garamond + IBM Plex -->
+    <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+    <style>
+        :root {
+            --inflow: #2C5F7F;
+            --outflow: #CC8844;
+            --background: #F5EDE0;
+            --background-dark: #E8DFD0;
+            --text: #1A1A1A;
+            --text-muted: #5A5A5A;
+            --accent: #50C878;
+            --loss: #A3320B;
+            --card-bg: rgba(255, 255, 255, 0.85);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'IBM Plex Sans', -apple-system, sans-serif;
+            background: var(--background);
+            color: var(--text);
+            min-height: 100vh;
+        }
+
+        /* Header */
+        header {
+            padding: 32px 40px 24px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            font-family: 'EB Garamond', Georgia, serif;
+            font-size: 3.2rem;
+            font-weight: 600;
+            letter-spacing: -0.02em;
+            line-height: 1.1;
+            margin-bottom: 8px;
+        }
+
+        .subtitle {
+            font-size: 1.15rem;
+            color: var(--text-muted);
+            font-weight: 300;
+            max-width: 600px;
+        }
+
+        /* Stat Cards */
+        .stat-cards {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 16px;
+            padding: 0 40px 24px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            border-radius: 8px;
+            padding: 20px;
+            border: 1px solid rgba(0,0,0,0.06);
+        }
+
+        .stat-number {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 1.8rem;
+            font-weight: 500;
+            color: var(--text);
+        }
+
+        .stat-number.gain { color: var(--accent); }
+        .stat-number.loss { color: var(--loss); }
+
+        .stat-label {
+            font-size: 0.85rem;
+            color: var(--text-muted);
+            margin-top: 4px;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        /* Main content */
+        .main-content {
+            display: grid;
+            grid-template-columns: 1fr 320px;
+            gap: 24px;
+            padding: 0 40px 40px;
+            max-width: 1400px;
+            margin: 0 auto;
+            height: calc(100vh - 280px);
+            min-height: 500px;
+        }
+
+        /* Map container */
+        .map-container {
+            position: relative;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid rgba(0,0,0,0.1);
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+        }
+
+        /* Tooltip */
+        .tooltip {
+            position: absolute;
+            pointer-events: none;
+            background: var(--text);
+            color: var(--background);
+            padding: 12px 16px;
+            border-radius: 6px;
+            font-size: 0.9rem;
+            max-width: 300px;
+            z-index: 100;
+            opacity: 0;
+            transition: opacity 0.15s;
+        }
+
+        .tooltip.visible { opacity: 1; }
+
+        .tooltip-title {
+            font-family: 'EB Garamond', serif;
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 6px;
+        }
+
+        .tooltip-stat {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.85rem;
+        }
+
+        /* Sidebar */
+        .sidebar {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .panel {
+            background: var(--card-bg);
+            border-radius: 8px;
+            padding: 20px;
+            border: 1px solid rgba(0,0,0,0.06);
+        }
+
+        .panel-title {
+            font-family: 'EB Garamond', serif;
+            font-size: 1.2rem;
+            font-weight: 600;
+            margin-bottom: 16px;
+        }
+
+        /* Filters */
+        .filter-group {
+            margin-bottom: 16px;
+        }
+
+        .filter-label {
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            margin-bottom: 6px;
+        }
+
+        select, input[type="range"] {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid rgba(0,0,0,0.15);
+            border-radius: 6px;
+            font-family: inherit;
+            font-size: 0.95rem;
+            background: white;
+        }
+
+        select:focus {
+            outline: none;
+            border-color: var(--inflow);
+        }
+
+        /* Toggle buttons */
+        .toggle-group {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 16px;
+        }
+
+        .toggle-btn {
+            flex: 1;
+            padding: 10px 8px;
+            border: 1px solid rgba(0,0,0,0.15);
+            background: white;
+            font-family: inherit;
+            font-size: 0.85rem;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .toggle-btn:first-child { border-radius: 6px 0 0 6px; }
+        .toggle-btn:last-child { border-radius: 0 6px 6px 0; }
+
+        .toggle-btn.active {
+            background: var(--text);
+            color: var(--background);
+            border-color: var(--text);
+        }
+
+        .toggle-btn.inflow.active { background: var(--inflow); border-color: var(--inflow); }
+        .toggle-btn.outflow.active { background: var(--outflow); border-color: var(--outflow); }
+
+        /* County details */
+        .county-details {
+            display: none;
+        }
+
+        .county-details.visible { display: block; }
+
+        .county-name {
+            font-family: 'EB Garamond', serif;
+            font-size: 1.3rem;
+            font-weight: 600;
+            margin-bottom: 12px;
+        }
+
+        .flow-list {
+            max-height: 200px;
+            overflow-y: auto;
+        }
+
+        .flow-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(0,0,0,0.06);
+            font-size: 0.9rem;
+        }
+
+        .flow-item:last-child { border-bottom: none; }
+
+        .flow-county { flex: 1; }
+        .flow-value {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.85rem;
+            color: var(--text-muted);
+        }
+
+        /* Legend */
+        .legend {
+            display: flex;
+            gap: 20px;
+            margin-top: 8px;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.85rem;
+        }
+
+        .legend-color {
+            width: 24px;
+            height: 4px;
+            border-radius: 2px;
+        }
+
+        .legend-color.inflow { background: var(--inflow); }
+        .legend-color.outflow { background: var(--outflow); }
+
+        /* Editorial callouts */
+        .callouts {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            padding: 0 40px 40px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .callout {
+            background: var(--card-bg);
+            border-radius: 8px;
+            padding: 24px;
+            border-left: 4px solid var(--inflow);
+        }
+
+        .callout.loss { border-left-color: var(--outflow); }
+
+        .callout-stat {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 2rem;
+            font-weight: 500;
+            margin-bottom: 8px;
+        }
+
+        .callout-stat.gain { color: var(--accent); }
+        .callout-stat.loss { color: var(--loss); }
+
+        .callout-text {
+            font-family: 'EB Garamond', serif;
+            font-size: 1.1rem;
+            line-height: 1.5;
+        }
+
+        /* Footer */
+        footer {
+            padding: 24px 40px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            border-top: 1px solid rgba(0,0,0,0.06);
+        }
+
+        footer a {
+            color: var(--inflow);
+            text-decoration: none;
+        }
+
+        /* Loading state */
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: 0.9rem;
+            color: var(--text-muted);
+        }
+
+        /* Mobile */
+        @media (max-width: 1000px) {
+            .main-content {
+                grid-template-columns: 1fr;
+                height: auto;
+            }
+
+            .map-container {
+                height: 60vh;
+                min-height: 400px;
+            }
+
+            .stat-cards {
+                grid-template-columns: repeat(2, 1fr);
+            }
+
+            .callouts {
+                grid-template-columns: 1fr;
+            }
+
+            h1 { font-size: 2.4rem; }
+
+            header, .stat-cards, .main-content, .callouts {
+                padding-left: 20px;
+                padding-right: 20px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>Follow the Money</h1>
+        <p class="subtitle">Where Americans actually move—and take their income. IRS data reveals 6.5 million tax returns crossed county lines in 2021-2022.</p>
+    </header>
+
+    <div class="stat-cards">
+        <div class="stat-card">
+            <div class="stat-number">6.5M</div>
+            <div class="stat-label">Tax Returns Moved</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number">$558B</div>
+            <div class="stat-label">Income Migrated</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number gain">+11,721</div>
+            <div class="stat-label">Top Gainer (Polk, FL)</div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-number loss">-6,097</div>
+            <div class="stat-label">Top Loser (Montgomery, MD)</div>
+        </div>
+    </div>
+
+    <div class="main-content">
+        <div class="map-container">
+            <div id="map"></div>
+            <div class="tooltip" id="tooltip"></div>
+            <div class="loading" id="loading">Loading migration data...</div>
+        </div>
+
+        <div class="sidebar">
+            <div class="panel">
+                <div class="panel-title">View Controls</div>
+
+                <div class="filter-group">
+                    <div class="filter-label">Direction</div>
+                    <div class="toggle-group">
+                        <button class="toggle-btn inflow" data-direction="inflow">Inflow</button>
+                        <button class="toggle-btn outflow" data-direction="outflow">Outflow</button>
+                        <button class="toggle-btn active" data-direction="both">Both</button>
+                    </div>
+                </div>
+
+                <div class="filter-group">
+                    <div class="filter-label">Show Top Flows</div>
+                    <select id="flowCount">
+                        <option value="50">Top 50</option>
+                        <option value="100">Top 100</option>
+                        <option value="250" selected>Top 250</option>
+                        <option value="500">Top 500</option>
+                    </select>
+                </div>
+
+                <div class="filter-group">
+                    <div class="filter-label">Minimum Returns</div>
+                    <select id="minReturns">
+                        <option value="1000">1,000+ returns</option>
+                        <option value="2000" selected>2,000+ returns</option>
+                        <option value="5000">5,000+ returns</option>
+                        <option value="10000">10,000+ returns</option>
+                    </select>
+                </div>
+
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-color inflow"></div>
+                        <span>People arriving</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color outflow"></div>
+                        <span>People leaving</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="panel county-details" id="countyDetails">
+                <div class="panel-title">County Details</div>
+                <div class="county-name" id="countyName">Select a county</div>
+                <div class="flow-list" id="flowList"></div>
+            </div>
+        </div>
+    </div>
+
+    <div class="callouts">
+        <div class="callout">
+            <div class="callout-stat gain">+$2.7B</div>
+            <div class="callout-text">Clark County (Las Vegas) gained the most taxable income of any US county—much of it from California.</div>
+        </div>
+        <div class="callout loss">
+            <div class="callout-stat loss">-$1.1B</div>
+            <div class="callout-text">Hennepin County (Minneapolis) lost over a billion in AGI as residents fled to Florida and Texas.</div>
+        </div>
+        <div class="callout">
+            <div class="callout-stat">21,267</div>
+            <div class="callout-text">The LA→Orange County corridor is America's busiest migration route—$2.4B in income moving just 30 miles.</div>
+        </div>
+    </div>
+
+    <footer>
+        Data: <a href="https://www.irs.gov/statistics/soi-tax-stats-migration-data" target="_blank">IRS Statistics of Income</a>, 2021-2022 Tax Year |
+        Built with deck.gl + Mapbox
+    </footer>
+
+    <script>
+        // Colors
+        const COLORS = {
+            inflow: [44, 95, 127],      // Teal
+            outflow: [204, 136, 68],    // Ochre
+            highlight: [255, 255, 255]
+        };
+
+        // State
+        let allFlows = [];
+        let currentDirection = 'both';
+        let currentFlowCount = 250;
+        let currentMinReturns = 2000;
+        let selectedCounty = null;
+        let deckgl = null;
+
+        // Initialize map with MapLibre (free, no token)
+        const map = new maplibregl.Map({
+            container: 'map',
+            style: 'https://basemaps.cartocdn.com/gl/positron-gl-style/style.json',
+            center: [-96, 38],
+            zoom: 4.2,
+            maxBounds: [[-130, 20], [-60, 52]]
+        });
+
+        // Tooltip
+        const tooltip = document.getElementById('tooltip');
+
+        function showTooltip(x, y, content) {
+            tooltip.innerHTML = content;
+            tooltip.style.left = x + 16 + 'px';
+            tooltip.style.top = y + 16 + 'px';
+            tooltip.classList.add('visible');
+        }
+
+        function hideTooltip() {
+            tooltip.classList.remove('visible');
+        }
+
+        // Format numbers
+        function formatNumber(n) {
+            if (n >= 1e9) return '$' + (n / 1e9).toFixed(1) + 'B';
+            if (n >= 1e6) return '$' + (n / 1e6).toFixed(1) + 'M';
+            if (n >= 1e3) return n.toLocaleString();
+            return n.toString();
+        }
+
+        // Get filtered flows
+        function getFilteredFlows() {
+            let flows = allFlows.filter(f => f.returns >= currentMinReturns);
+
+            // Sort and limit
+            flows.sort((a, b) => b.returns - a.returns);
+            flows = flows.slice(0, currentFlowCount);
+
+            return flows;
+        }
+
+        // Create deck.gl layer
+        function createArcLayer() {
+            const flows = getFilteredFlows();
+
+            return new deck.ArcLayer({
+                id: 'arcs',
+                data: flows,
+                getSourcePosition: d => d.from,
+                getTargetPosition: d => d.to,
+                getSourceColor: d => {
+                    if (currentDirection === 'outflow') return [...COLORS.outflow, 180];
+                    if (currentDirection === 'inflow') return [...COLORS.inflow, 180];
+                    return [...COLORS.outflow, 150]; // Both mode
+                },
+                getTargetColor: d => {
+                    if (currentDirection === 'outflow') return [...COLORS.outflow, 180];
+                    if (currentDirection === 'inflow') return [...COLORS.inflow, 180];
+                    return [...COLORS.inflow, 150]; // Both mode - gradient
+                },
+                getWidth: d => Math.max(0.5, Math.sqrt(d.returns) * 0.03),
+                getHeight: 0.5,
+                greatCircle: true,
+                pickable: true,
+                autoHighlight: true,
+                highlightColor: [255, 255, 255, 255],
+                onHover: info => {
+                    if (info.object) {
+                        const d = info.object;
+                        const content = `
+                            <div class="tooltip-title">${d.from_name} → ${d.to_name}</div>
+                            <div class="tooltip-stat">${d.returns.toLocaleString()} returns</div>
+                            <div class="tooltip-stat">${formatNumber(d.agi)} AGI</div>
+                        `;
+                        showTooltip(info.x, info.y, content);
+                    } else {
+                        hideTooltip();
+                    }
+                },
+                onClick: info => {
+                    if (info.object) {
+                        selectCounty(info.object.from_fips, info.object.from_name);
+                    }
+                }
+            });
+        }
+
+        // Initialize deck.gl overlay
+        function initDeckGL() {
+            deckgl = new deck.MapboxOverlay({
+                interleaved: false,
+                layers: [createArcLayer()]
+            });
+            map.addControl(deckgl);
+        }
+
+        // Update layers
+        function updateLayers() {
+            if (deckgl) {
+                deckgl.setProps({
+                    layers: [createArcLayer()]
+                });
+            }
+        }
+
+        // Select county
+        function selectCounty(fips, name) {
+            selectedCounty = fips;
+
+            const details = document.getElementById('countyDetails');
+            const countyName = document.getElementById('countyName');
+            const flowList = document.getElementById('flowList');
+
+            details.classList.add('visible');
+            countyName.textContent = name.replace(', ', ' County, ');
+
+            // Find flows for this county
+            const outflows = allFlows.filter(f => f.from_fips === fips).sort((a, b) => b.returns - a.returns).slice(0, 10);
+            const inflows = allFlows.filter(f => f.to_fips === fips).sort((a, b) => b.returns - a.returns).slice(0, 10);
+
+            let html = '';
+            if (outflows.length > 0) {
+                html += '<div style="font-weight:600;margin-bottom:8px;color:var(--outflow)">Top Destinations</div>';
+                outflows.forEach(f => {
+                    html += `<div class="flow-item">
+                        <span class="flow-county">${f.to_name.split(',')[0]}</span>
+                        <span class="flow-value">${f.returns.toLocaleString()}</span>
+                    </div>`;
+                });
+            }
+            if (inflows.length > 0) {
+                html += '<div style="font-weight:600;margin:12px 0 8px;color:var(--inflow)">Top Origins</div>';
+                inflows.forEach(f => {
+                    html += `<div class="flow-item">
+                        <span class="flow-county">${f.from_name.split(',')[0]}</span>
+                        <span class="flow-value">${f.returns.toLocaleString()}</span>
+                    </div>`;
+                });
+            }
+
+            flowList.innerHTML = html;
+        }
+
+        // Event listeners
+        document.querySelectorAll('.toggle-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.toggle-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                currentDirection = btn.dataset.direction;
+                updateLayers();
+            });
+        });
+
+        document.getElementById('flowCount').addEventListener('change', e => {
+            currentFlowCount = parseInt(e.target.value);
+            updateLayers();
+        });
+
+        document.getElementById('minReturns').addEventListener('change', e => {
+            currentMinReturns = parseInt(e.target.value);
+            updateLayers();
+        });
+
+        // Load data
+        async function loadData() {
+            console.log('Loading data...');
+            try {
+                const response = await fetch('flows_top1000.json');
+                if (!response.ok) throw new Error('HTTP ' + response.status);
+                allFlows = await response.json();
+                console.log('Loaded', allFlows.length, 'flows');
+                document.getElementById('loading').style.display = 'none';
+                initDeckGL();
+            } catch (err) {
+                console.error('Error loading data:', err);
+                document.getElementById('loading').textContent = 'Error: ' + err.message;
+            }
+        }
+
+        // Start - load data when map is ready
+        map.on('load', () => {
+            console.log('Map loaded');
+            loadData();
+        });
+
+        map.on('error', (e) => {
+            console.error('Map error:', e);
+            document.getElementById('loading').textContent = 'Map error: ' + e.error.message;
+        });
+    </script>
+</body>
+</html>

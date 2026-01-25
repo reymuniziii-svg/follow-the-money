@@ -1,0 +1,10 @@
+# Raw data files (too large for GitHub)
+countyinflow2122.csv
+countyoutflow2122.csv
+flows_all.json
+
+# Processing script (not needed for web)
+process_data.py
+
+# OS files
+.DS_Store
