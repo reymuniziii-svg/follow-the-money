@@ -34,6 +34,7 @@ IRS Statistics of Income (SOI) County-to-County Migration Data, 2021-2022
 ## Files
 
 - `scrollytelling.html` - Main visualization (self-contained)
+- `index.html` - Standalone flow explorer dashboard with direction/volume filters
 - `flows_top1000.json` - Top 1,000 migration corridors
 - `county_stats.json` - County-level migration statistics
 - `us-counties.json` - US county boundaries (GeoJSON)

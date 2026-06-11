@@ -10,7 +10,6 @@
     <meta property="og:title" content="Follow the Money: Where Americans Actually Moved">
     <meta property="og:description" content="$558 billion in taxable income changed addresses. Explore the Great American Reshuffling of 2021-2022.">
     <meta property="og:type" content="website">
-    <meta property="og:image" content="preview.png">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Follow the Money: Where Americans Actually Moved">
     <meta name="twitter:description" content="$558 billion in taxable income changed addresses. Interactive migration visualization.">
@@ -29,6 +28,9 @@
 
     <!-- D3.js -->
     <script src="https://d3js.org/d3.v7.min.js"></script>
+
+    <!-- TopoJSON client (for mini-map state outlines) -->
+    <script src="https://cdn.jsdelivr.net/npm/topojson-client@3/dist/topojson-client.min.js"></script>
 
     <!-- Scrollama -->
     <script src="https://unpkg.com/scrollama@3.2.0/build/scrollama.min.js"></script>
@@ -679,12 +681,26 @@
             cursor: pointer;
             border-bottom: 1px solid rgba(0, 0, 0, 0.05);
             transition: all 0.2s ease;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            gap: 1rem;
         }
 
-        .search-result-item:hover {
+        .search-result-item:hover,
+        .search-result-item.selected {
             background: rgba(224, 122, 95, 0.08);
             padding-left: 2rem;
         }
+
+        .result-net {
+            font-family: 'IBM Plex Mono', monospace;
+            font-size: var(--text-xs);
+            white-space: nowrap;
+        }
+
+        .result-net.pos { color: #2c8a55; }
+        .result-net.neg { color: var(--loss); }
 
         .search-result-item:last-child {
             border-bottom: none;
@@ -1146,8 +1162,8 @@
 
         .corridor-modal__stats {
             display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 1rem;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 0.75rem;
             margin-bottom: 1.5rem;
         }
 
@@ -1544,7 +1560,7 @@
                 <!-- Left Column: Mini-map + Stats Card -->
                 <div class="county-card" id="county-card">
                     <div class="mini-map-container">
-                        <svg id="mini-map" viewBox="0 0 960 600"></svg>
+                        <svg id="mini-map" viewBox="0 0 975 610"></svg>
                         <div class="county-header-info">
                             <h3 class="county-name display" id="selected-county-name">-</h3>
                             <p class="county-state" id="selected-county-state">Select a county above</p>
@@ -1651,6 +1667,10 @@
                     <div class="corridor-stat__value" id="corridor-income">-</div>
                     <div class="corridor-stat__label">Income transferred</div>
                 </div>
+                <div class="corridor-stat">
+                    <div class="corridor-stat__value" id="corridor-avg">-</div>
+                    <div class="corridor-stat__label">Avg per household</div>
+                </div>
             </div>
             <div class="corridor-modal__reverse" id="corridor-reverse">
                 <span class="corridor-reverse__label">Reverse flow:</span>
@@ -1663,6 +1683,7 @@
     <!-- Footer -->
     <footer class="footer">
         <p class="footer-source">Data: <a href="https://www.irs.gov/statistics/soi-tax-stats-migration-data" target="_blank">IRS Statistics of Income</a>, County-to-County Migration 2021-2022</p>
+        <p class="footer-source"><a href="index.html">Open the interactive flow explorer &rarr;</a></p>
         <p class="footer-credit">Visualization crafted with deck.gl, D3.js, and Scrollama</p>
     </footer>
 
@@ -1738,6 +1759,34 @@
             '51': 'Virginia', '53': 'Washington', '54': 'West Virginia', '55': 'Wisconsin', '56': 'Wyoming'
         };
 
+        const STATE_ABBR = {
+            '01': 'AL', '02': 'AK', '04': 'AZ', '05': 'AR', '06': 'CA', '08': 'CO', '09': 'CT',
+            '10': 'DE', '11': 'DC', '12': 'FL', '13': 'GA', '15': 'HI', '16': 'ID', '17': 'IL',
+            '18': 'IN', '19': 'IA', '20': 'KS', '21': 'KY', '22': 'LA', '23': 'ME', '24': 'MD',
+            '25': 'MA', '26': 'MI', '27': 'MN', '28': 'MS', '29': 'MO', '30': 'MT', '31': 'NE',
+            '32': 'NV', '33': 'NH', '34': 'NJ', '35': 'NM', '36': 'NY', '37': 'NC', '38': 'ND',
+            '39': 'OH', '40': 'OK', '41': 'OR', '42': 'PA', '44': 'RI', '45': 'SC', '46': 'SD',
+            '47': 'TN', '48': 'TX', '49': 'UT', '50': 'VT', '51': 'VA', '53': 'WA', '54': 'WV',
+            '55': 'WI', '56': 'WY'
+        };
+
+        // The raw IRS data suffixes names with the state FIPS code ("Los Angeles County, 06").
+        // Rewrite to a readable state abbreviation once at load time.
+        function fixCountyName(name) {
+            return name ? name.replace(/, (\d{2})$/, (_, s) => ', ' + (STATE_ABBR[s] || s)) : name;
+        }
+
+        function countyOnly(name) {
+            return name ? name.split(',')[0] : '';
+        }
+
+        function formatAgi(n) {
+            const abs = Math.abs(n);
+            if (abs >= 1e9) return '$' + (n / 1e9).toFixed(1) + 'B';
+            if (abs >= 1e6) return '$' + (n / 1e6).toFixed(1) + 'M';
+            return '$' + Math.round(n / 1e3) + 'K';
+        }
+
         // ============================================
         // HERO ANIMATION - Enhanced Counter
         // ============================================
@@ -1806,7 +1855,11 @@
                         </div>
                         <div class="tooltip-row">
                             <span class="tooltip-label">Income moved</span>
-                            <span class="tooltip-value">$${(object.agi / 1000000).toFixed(1)}M</span>
+                            <span class="tooltip-value">${formatAgi(object.agi)}</span>
+                        </div>
+                        <div class="tooltip-row">
+                            <span class="tooltip-label">Avg per household</span>
+                            <span class="tooltip-value">$${Math.round(object.agi / object.returns / 1000)}K</span>
                         </div>
                     `
                 }
@@ -1821,50 +1874,62 @@
             setTimeout(() => updateMapForStep(1), 500);
         }
 
+        // Static layers (choropleth, glow, arc track) don't animate, so they are
+        // built once per step change instead of once per frame.
+        let staticLayers = [];
+        let arcTrackLayer = null;
+        let lastFrameTime = 0;
+        const FRAME_INTERVAL = 33; // ~30fps is plenty for the flow pulse
+
+        function rebuildStaticLayers() {
+            staticLayers = [];
+            if (currentStep >= 4 && countyGeoJson) {
+                const choropleth = createChoroplethLayer();
+                if (choropleth) staticLayers.push(choropleth);
+            }
+            if (currentStep >= 4) {
+                const topCounties = countyStats
+                    .filter(c => c.centroid && Math.abs(c.net) > 3000)
+                    .slice(0, 20);
+                staticLayers.push(createGlowLayer(topCounties));
+            }
+        }
+
+        function setCurrentFlows(flows) {
+            currentFlows = flows;
+            arcTrackLayer = createArcTrackLayer(flows, 40);
+        }
+
         function startFlowAnimation() {
             if (animationFrame) cancelAnimationFrame(animationFrame);
 
             function animate(timestamp) {
-                if (!isFlowAnimating) return;
+                animationFrame = requestAnimationFrame(animate);
 
+                if (!isFlowAnimating || !deckOverlay || isTransitioning || !currentFlows.length) return;
+                if (timestamp - lastFrameTime < FRAME_INTERVAL) return;
+                lastFrameTime = timestamp;
                 flowAnimationTime = timestamp;
 
-                // Only update if we have flows and overlay
-                if (deckOverlay && currentFlows.length > 0 && !isTransitioning) {
-                    const layers = [];
+                const layers = [...staticLayers, arcTrackLayer, createArcLayer(currentFlows, arcOpacity)];
 
-                    // Layer 1: Choropleth underlay (shows for steps 4+)
-                    if (currentStep >= 4 && countyGeoJson) {
-                        const choropleth = createChoroplethLayer();
-                        if (choropleth) layers.push(choropleth);
-                    }
-
-                    // Layer 2: Glow effects for top destinations (steps 4+)
-                    if (currentStep >= 4) {
-                        const topCounties = countyStats
-                            .filter(c => c.centroid && Math.abs(c.net) > 3000)
-                            .slice(0, 20);
-                        layers.push(createGlowLayer(topCounties));
-                    }
-
-                    // Layer 3: Arc track (subtle background)
-                    layers.push(createArcTrackLayer(currentFlows, 40));
-
-                    // Layer 4: Animated arc flows
-                    layers.push(createArcLayer(currentFlows, arcOpacity));
-
-                    // Layer 5: Particle dots traveling along arcs (optional, for extra wow)
-                    if (currentFlows.length <= 200) {
-                        layers.push(createParticleLayer(currentFlows));
-                    }
-
-                    deckOverlay.setProps({ layers });
+                // Particle dots traveling along arcs (only for smaller flow sets)
+                if (currentFlows.length <= 200) {
+                    layers.push(createParticleLayer(currentFlows));
                 }
 
-                animationFrame = requestAnimationFrame(animate);
+                deckOverlay.setProps({ layers });
             }
 
             animationFrame = requestAnimationFrame(animate);
+
+            // Pause the animation while the map is scrolled out of view
+            const graphic = document.querySelector('.scrolly__graphic');
+            if (graphic && 'IntersectionObserver' in window) {
+                new IntersectionObserver(entries => {
+                    isFlowAnimating = entries[0].isIntersecting;
+                }).observe(graphic);
+            }
         }
 
         // Background "track" layer - subtle static arcs
@@ -1898,8 +1963,7 @@
                         return [255, 255, 255, 255];
                     }
                     // Create wave effect - each arc gets unique phase based on index
-                    const idx = filteredFlows.indexOf(d);
-                    const wave = Math.sin(flowPhase + idx * 0.15);
+                    const wave = Math.sin(flowPhase + d._idx * 0.15);
                     // Source dims as "particle" travels toward destination
                     const intensity = wave * 0.4 + 0.6; // 0.2 to 1.0
                     return [224, 122, 95, Math.floor(opacity * intensity)];
@@ -1909,8 +1973,7 @@
                         return [255, 255, 255, 255];
                     }
                     // Target brightens as "particle" arrives
-                    const idx = filteredFlows.indexOf(d);
-                    const wave = Math.sin(flowPhase + idx * 0.15 + Math.PI); // Offset for flow
+                    const wave = Math.sin(flowPhase + d._idx * 0.15 + Math.PI); // Offset for flow
                     const intensity = wave * 0.4 + 0.6;
                     return [129, 178, 154, Math.floor(opacity * intensity)];
                 },
@@ -1918,16 +1981,12 @@
                     const base = Math.max(1, Math.log(d.returns) * 0.7);
                     if (highlightedArc === d) return base * 2.5;
                     // Width pulses with the flow
-                    const idx = filteredFlows.indexOf(d);
-                    const wave = Math.sin(flowPhase + idx * 0.15);
+                    const wave = Math.sin(flowPhase + d._idx * 0.15);
                     const pulse = wave * 0.2 + 1; // 0.8 to 1.2
                     return base * pulse;
                 },
                 // Tilt adds 3D depth to the arcs
-                getTilt: d => {
-                    const idx = filteredFlows.indexOf(d);
-                    return Math.sin(flowPhase * 0.5 + idx * 0.1) * 5; // Subtle sway
-                },
+                getTilt: d => Math.sin(flowPhase * 0.5 + d._idx * 0.1) * 5,
                 greatCircle: true,
                 pickable: true,
                 autoHighlight: true,
@@ -2045,8 +2104,13 @@
 
         let currentFlows = [];
 
+        let stepTransitionTimers = [];
+
         function updateMapForStep(step) {
-            if (!deckOverlay || !flowsData.length || isTransitioning) return;
+            if (!deckOverlay || !flowsData.length) return;
+            // Latest requested step always wins - cancel any in-flight transition
+            stepTransitionTimers.forEach(clearTimeout);
+            stepTransitionTimers = [];
             isTransitioning = true;
             currentStep = step;
 
@@ -2138,14 +2202,17 @@
                     filteredFlows = flowsData.slice(0, 300);
             }
 
+            // Rebuild non-animated layers (choropleth, glow) for the new step
+            rebuildStaticLayers();
+
             // CINEMATIC TRANSITION: Fade out -> Move -> Fade in
             // Step 1: Fade out current arcs (pause animation during transition)
             arcOpacity = 0;
 
             // Step 2: Start camera movement after brief pause
-            setTimeout(() => {
+            stepTransitionTimers.push(setTimeout(() => {
                 // Update the flows while camera is moving
-                currentFlows = filteredFlows;
+                setCurrentFlows(filteredFlows);
 
                 map.flyTo({
                     center: mapConfig.center,
@@ -2155,14 +2222,14 @@
                     duration: 1800,
                     essential: true
                 });
-            }, 150);
+            }, 150));
 
             // Step 3: Fade in new arcs after camera starts moving
-            setTimeout(() => {
+            stepTransitionTimers.push(setTimeout(() => {
                 arcOpacity = 180;
                 isTransitioning = false;
                 // Animation loop will pick up the new flows automatically
-            }, 1100);
+            }, 1100));
         }
 
         // ============================================
@@ -2227,9 +2294,23 @@
         function initExplorer() {
             const searchInput = document.getElementById('county-search');
             const searchResults = document.getElementById('search-results');
+            let searchIndex = -1;
+
+            function pickResult(item) {
+                selectCounty(item.dataset.fips);
+                searchResults.classList.remove('active');
+                searchInput.value = item.dataset.label;
+                searchIndex = -1;
+            }
+
+            function setHighlight(items, idx) {
+                items.forEach((item, i) => item.classList.toggle('selected', i === idx));
+                if (idx >= 0 && items[idx]) items[idx].scrollIntoView({ block: 'nearest' });
+            }
 
             searchInput.addEventListener('input', (e) => {
                 const query = e.target.value.toLowerCase();
+                searchIndex = -1;
 
                 if (query.length < 2) {
                     searchResults.classList.remove('active');
@@ -2238,39 +2319,49 @@
 
                 const matches = countyStats
                     .filter(c => c.name && c.name.toLowerCase().includes(query))
+                    .sort((a, b) => (b.inflow + b.outflow) - (a.inflow + a.outflow))
                     .slice(0, 8);
 
                 if (matches.length > 0) {
                     searchResults.innerHTML = matches.map(c => {
                         const stateFips = c.fips.substring(0, 2);
                         const stateName = STATE_NAMES[stateFips] || stateFips;
-                        const countyName = c.name.replace(/, \d+$/, '');
-                        return `<div class="search-result-item" data-fips="${c.fips}">${countyName}, ${stateName}</div>`;
+                        const label = `${countyOnly(c.name)}, ${stateName}`;
+                        const netDisplay = (c.net > 0 ? '+' : '') + c.net.toLocaleString();
+                        const netClass = c.net >= 0 ? 'pos' : 'neg';
+                        return `<div class="search-result-item" data-fips="${c.fips}" data-label="${label}">
+                            <span>${label}</span>
+                            <span class="result-net ${netClass}">${netDisplay} net</span>
+                        </div>`;
                     }).join('');
                     searchResults.classList.add('active');
 
-                    document.querySelectorAll('.search-result-item').forEach(item => {
-                        item.addEventListener('click', () => {
-                            selectCounty(item.dataset.fips);
-                            searchResults.classList.remove('active');
-                            searchInput.value = item.textContent;
-                        });
+                    searchResults.querySelectorAll('.search-result-item').forEach(item => {
+                        item.addEventListener('click', () => pickResult(item));
                     });
                 } else {
                     searchResults.classList.remove('active');
                 }
             });
 
-            // Keyboard navigation
+            // Keyboard navigation through results
             searchInput.addEventListener('keydown', (e) => {
-                const items = document.querySelectorAll('.search-result-item');
-                const active = document.querySelector('.search-result-item:hover');
+                const items = Array.from(searchResults.querySelectorAll('.search-result-item'));
+                if (!items.length || !searchResults.classList.contains('active')) return;
 
-                if (e.key === 'Enter' && items.length > 0) {
-                    const first = items[0];
-                    selectCounty(first.dataset.fips);
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    searchIndex = (searchIndex + 1) % items.length;
+                    setHighlight(items, searchIndex);
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    searchIndex = (searchIndex - 1 + items.length) % items.length;
+                    setHighlight(items, searchIndex);
+                } else if (e.key === 'Enter') {
+                    pickResult(items[Math.max(0, searchIndex)]);
+                } else if (e.key === 'Escape') {
                     searchResults.classList.remove('active');
-                    searchInput.value = first.textContent;
+                    searchIndex = -1;
                 }
             });
 
@@ -2307,11 +2398,15 @@
                 });
 
                 const { latitude, longitude } = pos.coords;
+
+                // Boundaries load lazily - wait for them if they're not in yet
+                if (!countyGeoJson && geoJsonPromise) await geoJsonPromise;
+
                 const county = findCountyByCoords(longitude, latitude);
 
                 if (county) {
                     selectCounty(county.fips);
-                    showToast(`Found: ${county.name.replace(/, \d+$/, '')}`);
+                    showToast(`Found: ${countyOnly(county.name)}`);
                 } else {
                     showToast('Could not determine your county');
                 }
@@ -2405,7 +2500,7 @@
                 if (value > 0) {
                     return `Top ${100 - percentile}% for population gain`;
                 } else {
-                    return `More outflow than ${percentile}% of counties`;
+                    return `More outflow than ${100 - percentile}% of counties`;
                 }
             } else if (metric === 'agi') {
                 if (value > 0) {
@@ -2429,7 +2524,7 @@
             const county = countyStatsMap[fips];
             if (!county) return '';
 
-            const countyName = county.name.replace(/, \d+$/, '');
+            const countyName = countyOnly(county.name);
             const topOrigins = flowsData.filter(f => f.to_fips === fips).slice(0, 3);
             const topDests = flowsData.filter(f => f.from_fips === fips).slice(0, 3);
             const netPct = getPercentile(fips, 'net');
@@ -2524,7 +2619,7 @@
 
                 // After scroll, highlight this corridor
                 setTimeout(() => {
-                    currentFlows = [flow];
+                    setCurrentFlows([flow]);
                     arcOpacity = 255;
 
                     const bounds = [
@@ -2563,7 +2658,7 @@
             container.innerHTML = similar.map(c => {
                 const stateFips = c.fips.substring(0, 2);
                 const stateName = STATE_NAMES[stateFips] || '';
-                const countyName = c.name.replace(/, \d+$/, '');
+                const countyName = countyOnly(c.name);
                 const netDisplay = c.net > 0 ? `+${c.net.toLocaleString()}` : c.net.toLocaleString();
 
                 return `<div class="similar-county-chip" data-fips="${c.fips}">
@@ -2592,12 +2687,22 @@
         let statesGeoJson = null;
 
         async function initMiniMap() {
-            // We'll use a simplified approach - just highlight the county location
-            // Full state outlines would require loading another GeoJSON
+            // us-atlas pre-projected files use the standard geoAlbersUsa fit
+            // for a 975x610 viewport, so county centroids project consistently
             miniMapProjection = d3.geoAlbersUsa()
-                .scale(1100)
-                .translate([480, 300]);
-            miniMapPath = d3.geoPath().projection(miniMapProjection);
+                .scale(1300)
+                .translate([487.5, 305]);
+            miniMapPath = d3.geoPath();
+
+            try {
+                const res = await fetch('https://cdn.jsdelivr.net/npm/us-atlas@3/states-albers-10m.json');
+                const topo = await res.json();
+                statesGeoJson = topojson.feature(topo, topo.objects.states);
+                // Redraw if a county was selected before the outlines arrived
+                if (selectedCountyFips) updateMiniMap(selectedCountyFips);
+            } catch (err) {
+                console.warn('State outlines unavailable, mini-map falls back to marker only:', err);
+            }
         }
 
         function updateMiniMap(fips) {
@@ -2607,14 +2712,26 @@
             const svg = d3.select('#mini-map');
             svg.selectAll('*').remove();
 
-            // Draw US outline (simple rectangle for now)
-            svg.append('rect')
-                .attr('x', 80)
-                .attr('y', 80)
-                .attr('width', 800)
-                .attr('height', 440)
-                .attr('fill', 'rgba(255,255,255,0.02)')
-                .attr('rx', 8);
+            const stateFips = fips.substring(0, 2);
+
+            if (statesGeoJson) {
+                // Real US state outlines, with the selected state highlighted
+                svg.append('g')
+                    .selectAll('path')
+                    .data(statesGeoJson.features)
+                    .join('path')
+                    .attr('class', d => 'state' + (d.id === stateFips ? ' highlighted' : ''))
+                    .attr('d', miniMapPath);
+            } else {
+                // Fallback while outlines load (or if the CDN is unreachable)
+                svg.append('rect')
+                    .attr('x', 60)
+                    .attr('y', 60)
+                    .attr('width', 855)
+                    .attr('height', 490)
+                    .attr('fill', 'rgba(255,255,255,0.02)')
+                    .attr('rx', 8);
+            }
 
             // Project county centroid
             const projected = miniMapProjection(county.centroid);
@@ -2640,7 +2757,6 @@
                 .attr('class', 'county-marker');
 
             // State label
-            const stateFips = fips.substring(0, 2);
             const stateName = STATE_NAMES[stateFips] || '';
             svg.append('text')
                 .attr('x', projected[0])
@@ -2719,12 +2835,17 @@
                         navigateStep(-1);
                         break;
                     case 'Escape':
+                        // Corridor modal has its own Escape handler - let it win
+                        if (selectedCorridor) break;
                         // Clear county selection
                         selectedCountyFips = null;
                         document.getElementById('county-card').classList.remove('active');
                         document.getElementById('chord-placeholder').style.display = 'block';
                         document.getElementById('share-btn').style.display = 'none';
                         document.querySelector('#chord-diagram').innerHTML = '';
+                        document.getElementById('county-story').classList.remove('active');
+                        document.getElementById('flow-lists').classList.remove('active');
+                        document.getElementById('similar-counties').classList.remove('active');
                         updateURL();
                         break;
                     case '1':
@@ -2786,8 +2907,9 @@
             // Set stats
             document.getElementById('corridor-returns').textContent =
                 flow.returns.toLocaleString();
-            document.getElementById('corridor-income').textContent =
-                `$${(flow.agi / 1000000).toFixed(1)}M`;
+            document.getElementById('corridor-income').textContent = formatAgi(flow.agi);
+            document.getElementById('corridor-avg').textContent =
+                `$${Math.round(flow.agi / flow.returns / 1000)}K`;
 
             // Find reverse flow
             const reverseFlow = flowsData.find(f =>
@@ -2795,9 +2917,10 @@
             );
 
             if (reverseFlow) {
+                const net = flow.returns - reverseFlow.returns;
                 document.getElementById('corridor-reverse').style.display = 'flex';
                 document.getElementById('corridor-reverse-value').textContent =
-                    `${reverseFlow.returns.toLocaleString()} households`;
+                    `${reverseFlow.returns.toLocaleString()} households (net ${net > 0 ? '+' : ''}${net.toLocaleString()})`;
             } else {
                 document.getElementById('corridor-reverse').style.display = 'none';
             }
@@ -2874,7 +2997,7 @@
 
             const stateFips = fips.substring(0, 2);
             const stateName = STATE_NAMES[stateFips] || stateFips;
-            const countyName = county.name.replace(/, \d+$/, '');
+            const countyName = countyOnly(county.name);
 
             // Show card with animation
             document.getElementById('county-card').classList.add('active');
@@ -2902,9 +3025,9 @@
             const agiNet = county.agi_net || (county.agi_in - county.agi_out);
             setTimeout(() => {
                 if (Math.abs(agiNet) >= 1000000000) {
-                    agiEl.textContent = (agiNet > 0 ? '+$' : '-$') + (Math.abs(agiNet) / 1000000000).toFixed(1) + 'B';
+                    agiEl.textContent = (agiNet >= 0 ? '+$' : '-$') + (Math.abs(agiNet) / 1000000000).toFixed(1) + 'B';
                 } else {
-                    agiEl.textContent = (agiNet > 0 ? '+$' : '-$') + (Math.abs(agiNet) / 1000000).toFixed(0) + 'M';
+                    agiEl.textContent = (agiNet >= 0 ? '+$' : '-$') + (Math.abs(agiNet) / 1000000).toFixed(0) + 'M';
                 }
                 agiEl.className = 'county-stat-value ' + (agiNet >= 0 ? 'positive' : 'negative');
             }, 400);
@@ -2965,7 +3088,9 @@
                 .attr('transform', `translate(${width/2}, ${height/2})`);
 
             const selectedCounty = countyStats.find(c => c.fips === fips);
-            const countyName = selectedCounty ? selectedCounty.name.replace(/, \d+$/, '').split(' ')[0] : 'Selected';
+            const countyName = selectedCounty
+                ? countyOnly(selectedCounty.name).replace(/ (County|Parish|Borough|Census Area|Municipality|city)$/, '')
+                : 'Selected';
 
             // Center label
             g.append('text')
@@ -3041,10 +3166,9 @@
                 .attr('fill', '#81B29A')
                 .attr('font-size', '11px')
                 .attr('font-weight', '500')
-                .attr('text-transform', 'uppercase')
                 .attr('letter-spacing', '0.1em')
                 .attr('opacity', 0)
-                .text('Inbound')
+                .text('INBOUND')
                 .transition()
                 .delay(600)
                 .duration(300)
@@ -3056,10 +3180,9 @@
                 .attr('fill', '#E07A5F')
                 .attr('font-size', '11px')
                 .attr('font-weight', '500')
-                .attr('text-transform', 'uppercase')
                 .attr('letter-spacing', '0.1em')
                 .attr('opacity', 0)
-                .text('Outbound')
+                .text('OUTBOUND')
                 .transition()
                 .delay(600)
                 .duration(300)
@@ -3080,27 +3203,51 @@
             }
         }
 
+        let geoJsonPromise = null;
+
         async function loadData() {
             try {
                 console.log('Loading data...');
-                const [flowsRes, statsRes, summaryRes, geoRes] = await Promise.all([
+
+                // County boundaries (3+ MB) load in the background - they're only
+                // needed for the choropleth (step 4+) and geolocation, so don't
+                // block the hero, scrollytelling, or explorer on them.
+                geoJsonPromise = fetch('us-counties.json')
+                    .then(res => res.json())
+                    .then(geo => {
+                        countyGeoJson = geo;
+                        console.log(`Loaded ${geo.features.length} county polygons`);
+                        rebuildStaticLayers();
+                        return geo;
+                    })
+                    .catch(err => {
+                        console.error('County boundaries failed to load:', err);
+                        return null;
+                    });
+
+                const [flowsRes, statsRes, summaryRes] = await Promise.all([
                     fetch('flows_top1000.json'),
                     fetch('county_stats.json'),
-                    fetch('summary.json'),
-                    fetch('us-counties.json')
+                    fetch('summary.json')
                 ]);
 
                 flowsData = await flowsRes.json();
                 countyStats = await statsRes.json();
                 summaryData = await summaryRes.json();
-                countyGeoJson = await geoRes.json();
 
-                // Build lookup map for fast access
+                // Normalize names ("X County, 06" -> "X County, CA") and tag each
+                // flow with its index so animation accessors stay O(1)
+                flowsData.forEach((f, i) => {
+                    f._idx = i;
+                    f.from_name = fixCountyName(f.from_name);
+                    f.to_name = fixCountyName(f.to_name);
+                });
                 countyStats.forEach(stat => {
+                    stat.name = fixCountyName(stat.name);
                     countyStatsMap[stat.fips] = stat;
                 });
 
-                console.log(`Loaded ${flowsData.length} flows, ${countyStats.length} counties, ${countyGeoJson.features.length} polygons`);
+                console.log(`Loaded ${flowsData.length} flows, ${countyStats.length} counties`);
                 dataLoaded = true;
 
                 // Pre-calculate rankings for percentile display
@@ -3170,11 +3317,10 @@
             });
         }
 
-        // Start everything
-        document.addEventListener('DOMContentLoaded', () => {
-            initMapBase();
-            loadData();
-        });
+        // Start everything - this script sits at the end of <body>, so the DOM
+        // above is already parsed; kicking off immediately beats DOMContentLoaded
+        initMapBase();
+        loadData();
     </script>
 </body>
 </html>
