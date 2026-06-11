@@ -9,8 +9,8 @@
     <link href="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.css" rel="stylesheet">
     <script src="https://unpkg.com/maplibre-gl@3.6.2/dist/maplibre-gl.js"></script>
 
-    <!-- deck.gl -->
-    <script src="https://unpkg.com/deck.gl@latest/dist.min.js"></script>
+    <!-- deck.gl (pinned - @latest pulls in v9 with breaking API changes) -->
+    <script src="https://unpkg.com/deck.gl@8.9.33/dist.min.js"></script>
 
     <!-- Google Fonts: EB Garamond + IBM Plex -->
     <link href="https://fonts.googleapis.com/css2?family=EB+Garamond:ital,wght@0,400;0,500;0,600;0,700;1,400&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
@@ -384,7 +384,7 @@
 <body>
     <header>
         <h1>Follow the Money</h1>
-        <p class="subtitle">Where Americans actually move—and take their income. IRS data reveals 6.5 million tax returns crossed county lines in 2021-2022.</p>
+        <p class="subtitle">Where Americans actually move—and take their income. IRS data reveals 6.5 million tax returns crossed county lines in 2021-2022. <a href="scrollytelling.html" style="color: var(--inflow);">Read the guided story &rarr;</a></p>
     </header>
 
     <div class="stat-cards">
@@ -483,7 +483,8 @@
 
     <footer>
         Data: <a href="https://www.irs.gov/statistics/soi-tax-stats-migration-data" target="_blank">IRS Statistics of Income</a>, 2021-2022 Tax Year |
-        Built with deck.gl + Mapbox
+        <a href="scrollytelling.html">Guided story</a> |
+        Built with deck.gl + MapLibre
     </footer>
 
     <script>
@@ -493,6 +494,22 @@
             outflow: [204, 136, 68],    // Ochre
             highlight: [255, 255, 255]
         };
+
+        // The raw IRS data suffixes names with the state FIPS code ("Los Angeles County, 06")
+        const STATE_ABBR = {
+            '01': 'AL', '02': 'AK', '04': 'AZ', '05': 'AR', '06': 'CA', '08': 'CO', '09': 'CT',
+            '10': 'DE', '11': 'DC', '12': 'FL', '13': 'GA', '15': 'HI', '16': 'ID', '17': 'IL',
+            '18': 'IN', '19': 'IA', '20': 'KS', '21': 'KY', '22': 'LA', '23': 'ME', '24': 'MD',
+            '25': 'MA', '26': 'MI', '27': 'MN', '28': 'MS', '29': 'MO', '30': 'MT', '31': 'NE',
+            '32': 'NV', '33': 'NH', '34': 'NJ', '35': 'NM', '36': 'NY', '37': 'NC', '38': 'ND',
+            '39': 'OH', '40': 'OK', '41': 'OR', '42': 'PA', '44': 'RI', '45': 'SC', '46': 'SD',
+            '47': 'TN', '48': 'TX', '49': 'UT', '50': 'VT', '51': 'VA', '53': 'WA', '54': 'WV',
+            '55': 'WI', '56': 'WY'
+        };
+
+        function fixCountyName(name) {
+            return name ? name.replace(/, (\d{2})$/, (_, s) => ', ' + (STATE_ABBR[s] || s)) : name;
+        }
 
         // State
         let allFlows = [];
@@ -617,7 +634,7 @@
             const flowList = document.getElementById('flowList');
 
             details.classList.add('visible');
-            countyName.textContent = name.replace(', ', ' County, ');
+            countyName.textContent = name;
 
             // Find flows for this county
             const outflows = allFlows.filter(f => f.from_fips === fips).sort((a, b) => b.returns - a.returns).slice(0, 10);
@@ -673,6 +690,10 @@
                 const response = await fetch('flows_top1000.json');
                 if (!response.ok) throw new Error('HTTP ' + response.status);
                 allFlows = await response.json();
+                allFlows.forEach(f => {
+                    f.from_name = fixCountyName(f.from_name);
+                    f.to_name = fixCountyName(f.to_name);
+                });
                 console.log('Loaded', allFlows.length, 'flows');
                 document.getElementById('loading').style.display = 'none';
                 initDeckGL();
